@@ -1,107 +1,107 @@
-# Workflow de Desenvolvimento com Linear + Figma
+# Development Workflow with Linear + Figma
 
-Este projeto utiliza MCPs do Linear e Figma para um fluxo estruturado de desenvolvimento.
+This project uses Linear and Figma MCPs for a structured development flow.
 
-## Fluxo de Trabalho
+## Workflow
 
-### 1. Leitura da Task (Linear)
+### 1. Task Reading (Linear)
 
-Ao receber uma task do Linear:
-- Usar `mcp__linear__get_issue` para obter detalhes completos
-- Identificar links do Figma na descrição
-- Extrair requisitos e critérios de aceite
-- Apresentar resumo ao usuário para confirmação
+When receiving a Linear task:
+- Use `mcp__linear__get_issue` to get complete details
+- Identify Figma links in the description
+- Extract requirements and acceptance criteria
+- Present summary to user for confirmation
 
-### 2. Análise do Design (Figma)
+### 2. Design Analysis (Figma)
 
-Se houver link do Figma:
-- Extrair `fileKey` e `nodeId` da URL
-- Usar `mcp__figma__get_design_context` para obter código e estrutura
-- Usar `mcp__figma__get_variable_defs` para tokens de design (cores, espaçamentos, tipografia)
-- Usar `mcp__figma__get_screenshot` para visualização do design
-- Documentar tokens encontrados para uso na implementação
+If there's a Figma link:
+- Extract `fileKey` and `nodeId` from the URL
+- Use `mcp__figma__get_design_context` to get code and structure
+- Use `mcp__figma__get_variable_defs` for design tokens (colors, spacing, typography)
+- Use `mcp__figma__get_screenshot` for design visualization
+- Document found tokens for use in implementation
 
-### 3. Planejamento
+### 3. Planning
 
-SEMPRE entrar em modo de planejamento antes de implementar:
-- Usar `EnterPlanMode` para tarefas não-triviais
-- Listar todos os arquivos que serão criados/modificados
-- Detalhar componentes necessários
-- Mapear tokens do Figma para variáveis CSS/código
-- Aguardar aprovação do usuário antes de prosseguir
+ALWAYS enter planning mode before implementing:
+- Use `EnterPlanMode` for non-trivial tasks
+- List all files to be created/modified
+- Detail necessary components
+- Map Figma tokens to CSS variables/code
+- Wait for user approval before proceeding
 
-### 4. Implementação
+### 4. Implementation
 
-Durante a implementação:
-- Criar tasks com `TaskCreate` para acompanhamento
-- Seguir tokens e especificações do Figma
-- Manter código limpo e sem over-engineering
-- Atualizar status das tasks conforme progresso
+During implementation:
+- Create tasks with `TaskCreate` for tracking
+- Follow Figma tokens and specifications
+- Keep code clean without over-engineering
+- Update task status as progress is made
 
-### 5. Revisão
+### 5. Review
 
-Após implementação:
-- Revisar código gerado
-- Verificar aderência ao design do Figma
-- Garantir que todos os requisitos foram atendidos
-- Apresentar resultado ao usuário
+After implementation:
+- Review generated code
+- Verify adherence to Figma design
+- Ensure all requirements were met
+- Present result to user
 
-### 6. Documentação Final (Linear)
+### 6. Final Documentation (Linear)
 
-Ao finalizar a task:
-- Usar `mcp__linear__create_comment` para adicionar na issue:
-  - Link do PR (se houver)
-  - Passo a passo de como testar
-  - Screenshots ou observações relevantes
-- Usar `mcp__linear__update_issue` para atualizar status se necessário
+When finishing the task:
+- Use `mcp__linear__create_comment` to add to the issue:
+  - PR link (if any)
+  - Step-by-step testing instructions
+  - Screenshots or relevant observations
+- Use `mcp__linear__update_issue` to update status if needed
 
-## Comandos Úteis
+## Useful Commands
 
-### Buscar minhas tasks
+### Get my tasks
 ```
-mcp__linear__list_issues com assignee: "me"
-```
-
-### Buscar task específica
-```
-mcp__linear__get_issue com id: "ISSUE-123"
+mcp__linear__list_issues with assignee: "me"
 ```
 
-### Obter contexto do Figma
+### Get specific task
+```
+mcp__linear__get_issue with id: "ISSUE-123"
+```
+
+### Get Figma context
 ```
 URL: https://figma.com/design/{fileKey}/{fileName}?node-id={nodeId}
-mcp__figma__get_design_context com fileKey e nodeId extraídos
+mcp__figma__get_design_context with extracted fileKey and nodeId
 ```
 
-## Formato do Comentário de Teste (Linear)
+## Test Comment Format (Linear)
 
-Ao finalizar, adicionar comentário no formato:
+When finishing, add comment in this format:
 
 ```markdown
-## Implementação Concluída
+## Implementation Complete
 
-### Arquivos Modificados
-- `path/to/file.tsx` - Descrição da mudança
+### Modified Files
+- `path/to/file.tsx` - Change description
 
-### Como Testar
-1. Passo 1
-2. Passo 2
-3. Passo 3
+### How to Test
+1. Step 1
+2. Step 2
+3. Step 3
 
-### Observações
-- Notas relevantes sobre a implementação
+### Notes
+- Relevant notes about the implementation
 ```
 
-## Git e Commits
+## Git and Commits
 
-- **NUNCA** incluir "Co-Authored-By" nos commits - apenas o autor do usuário
-- Commits devem ser simples, sem assinaturas extras
-- Formato do commit: apenas a mensagem, sem rodapé de co-autoria
+- **NEVER** include "Co-Authored-By" in commits - only the user's author
+- Commits should be simple, without extra signatures
+- Commit format: just the message, no co-authorship footer
 
-## Regras
+## Rules
 
-- SEMPRE aguardar aprovação do usuário antes de implementar
-- SEMPRE ler a task completa antes de começar
-- SEMPRE verificar o Figma quando disponível
-- NUNCA pular a fase de planejamento para tasks complexas
-- NUNCA atualizar status do Linear sem confirmação do usuário
+- ALWAYS wait for user approval before implementing
+- ALWAYS read the complete task before starting
+- ALWAYS check Figma when available
+- NEVER skip the planning phase for complex tasks
+- NEVER update Linear status without user confirmation

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Claude Code Setup Script
-# Instala MCPs e configura o ambiente
+# Installs MCPs and configures the environment
 
 set -e
 
@@ -12,70 +12,70 @@ SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 echo "🚀 Claude Code Setup"
 echo "===================="
 
-# Verifica se o Claude Code está instalado
+# Check if Claude Code is installed
 if ! command -v claude &> /dev/null; then
-    echo "❌ Claude Code não encontrado. Instale primeiro: npm install -g @anthropic-ai/claude-code"
+    echo "❌ Claude Code not found. Install it first: npm install -g @anthropic-ai/claude-code"
     exit 1
 fi
 
-echo "✅ Claude Code encontrado"
+echo "✅ Claude Code found"
 
-# Verifica se jq está instalado
+# Check if jq is installed
 if ! command -v jq &> /dev/null; then
-    echo "📦 Instalando jq..."
+    echo "📦 Installing jq..."
     if command -v brew &> /dev/null; then
         brew install jq
     else
-        echo "❌ jq não encontrado. Instale manualmente: brew install jq"
+        echo "❌ jq not found. Install manually: brew install jq"
         exit 1
     fi
 fi
 
-# Backup do settings.json
+# Backup settings.json
 if [ -f "$SETTINGS_FILE" ]; then
     cp "$SETTINGS_FILE" "$SETTINGS_FILE.backup"
-    echo "📋 Backup criado: $SETTINGS_FILE.backup"
+    echo "📋 Backup created: $SETTINGS_FILE.backup"
 fi
 
-# Adiciona MCPs globais
+# Add global MCPs
 echo ""
-echo "📡 Configurando MCPs globais..."
+echo "📡 Configuring global MCPs..."
 
 GLOBAL_MCPS=$(cat "$SCRIPT_DIR/mcp-servers/global.json")
 
 if [ -f "$SETTINGS_FILE" ]; then
-    # Merge MCPs globais com settings existentes
+    # Merge global MCPs with existing settings
     EXISTING=$(cat "$SETTINGS_FILE")
     MERGED=$(echo "$EXISTING" | jq --argjson new "$(echo "$GLOBAL_MCPS" | jq '.mcpServers')" '.mcpServers = (.mcpServers // {}) + $new')
     echo "$MERGED" > "$SETTINGS_FILE"
 else
-    # Cria novo settings.json
+    # Create new settings.json
     echo "$GLOBAL_MCPS" | jq '{mcpServers: .mcpServers}' > "$SETTINGS_FILE"
 fi
 
-echo "✅ MCPs globais configurados"
+echo "✅ Global MCPs configured"
 
-# Instala dependências dos MCPs
+# Install MCP dependencies
 echo ""
-echo "📦 Verificando dependências..."
+echo "📦 Checking dependencies..."
 
-# uvx (para serena e basic-memory)
+# uvx (for serena and basic-memory)
 if ! command -v uvx &> /dev/null; then
-    echo "  Instalando uv..."
+    echo "  Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
-echo "✅ Dependências verificadas"
+echo "✅ Dependencies verified"
 
-# Resumo
+# Summary
 echo ""
-echo "🎉 Setup completo!"
+echo "🎉 Setup complete!"
 echo ""
-echo "MCPs Globais instalados:"
+echo "Global MCPs installed:"
 echo "  - serena"
 echo ""
-echo "Para adicionar MCPs por projeto, copie o conteúdo de:"
+echo "To add per-project MCPs, copy the content from:"
 echo "  $SCRIPT_DIR/mcp-servers/project.json"
 echo ""
-echo "Para usar o template de CLAUDE.md:"
+echo "To use the CLAUDE.md template:"
 echo "  cp $SCRIPT_DIR/templates/linear-figma.md /path/to/project/CLAUDE.md"
