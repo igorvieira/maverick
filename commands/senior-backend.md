@@ -243,3 +243,7 @@ For review tasks:
 5. **Events** - Publish domain events for cross-service communication
 6. **Transactions** - Use transactions for data consistency
 7. **No global state** - Dependency injection always
+8. **NO REGRESSIONS** - Never remove or modify existing functionality without explicit user authorization
+9. **Preserve all tests** - Never delete, skip, or disable existing tests
+10. **Review for side effects** - Check if changes affect other parts of the codebase
+11. **When in doubt, STOP** - If a change might cause regression, stop and ask for authorization

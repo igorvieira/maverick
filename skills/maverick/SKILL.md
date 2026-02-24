@@ -429,9 +429,39 @@ Apply senior-qa approach for validation:
   - Events published correctly
   - Event handlers working
 
+### REGRESSION CHECK (MANDATORY)
+
+**Before ANY delivery, verify NO REGRESSIONS were introduced:**
+
+- [ ] **Existing Tests**
+  - All existing tests still pass
+  - No tests were deleted or skipped
+  - Test coverage not reduced
+
+- [ ] **Existing Functionality**
+  - Features unrelated to the task still work
+  - No unintended side effects
+  - API contracts preserved
+
+- [ ] **Code Review for Regressions**
+  - Review diff for accidental deletions
+  - Check imports weren't broken
+  - Verify no shared utilities were modified incorrectly
+
+- [ ] **Authorization Check**
+  - If ANY existing functionality needs to change: **STOP and ask user**
+  - Never remove or modify existing behavior without explicit authorization
+  - Document any intentional changes to existing code
+
+**If regression is detected:**
+1. **STOP immediately**
+2. **DO NOT commit**
+3. **Revert the regression**
+4. **Ask user for authorization** if the change is intentional
+
 ### QA Verdict
 
-If ANY check fails:
+If ANY check fails (including regression check):
 - Document the failure
 - Fix the issue
 - Re-run verification
@@ -581,3 +611,7 @@ Use TaskList to track progress:
 9. **Make decisions autonomously** - document them, don't ask
 10. **Track time** for report scheduling
 11. **Always use Linear's branch name** - each task has a suggested branch name in Linear, always create branches using that exact name
+12. **NO REGRESSIONS** - never remove or modify existing functionality without explicit user authorization
+13. **Preserve all tests** - never delete, skip, or disable existing tests
+14. **Regression check mandatory** - QA phase must verify no regressions before delivery
+15. **When in doubt, STOP** - if a change might cause regression, stop and ask for authorization

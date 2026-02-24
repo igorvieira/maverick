@@ -396,3 +396,7 @@ go test ./...
 8. **Visual QA for frontend** - Always compare with Figma using Chrome DevTools
 9. **Document discrepancies** - Create detailed comparison reports
 10. **Check all viewports** - Desktop, tablet, and mobile
+11. **NO REGRESSIONS** - Verify all existing tests pass before approving any change
+12. **Preserve all tests** - Never delete, skip, or disable existing tests without explicit authorization
+13. **Regression testing mandatory** - Always run full test suite to detect unintended side effects
+14. **When in doubt, STOP** - If a change might cause regression, flag it immediately and ask for authorization

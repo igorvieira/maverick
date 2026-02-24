@@ -1,68 +1,68 @@
 # Claude Code Setup
 
-Minha configuração pessoal do Claude Code com MCPs, skills, commands e workflows.
+My personal Claude Code configuration with MCPs, skills, commands, and workflows.
 
-## Estrutura
+## Structure
 
 ```
 claude/
-├── mcp-servers/              # Configurações de MCP servers
-│   ├── global.json           # MCPs globais (todos os projetos)
-│   └── project.json          # MCPs por projeto
-├── skills/                   # Skills customizadas
-│   └── maverick/             # Workflow autônomo de desenvolvimento
+├── mcp-servers/              # MCP server configurations
+│   ├── global.json           # Global MCPs (all projects)
+│   └── project.json          # Per-project MCPs
+├── skills/                   # Custom skills
+│   └── maverick/             # Autonomous development workflow
 │       └── SKILL.md
 ├── commands/                 # Commands (slash commands)
-│   ├── maverick.md           # /maverick - desenvolvimento autônomo
-│   ├── maverick-single.md    # /maverick-single - para worktrees
-│   ├── senior-architect.md   # /senior-architect - arquitetura
+│   ├── maverick.md           # /maverick - autonomous development
+│   ├── maverick-single.md    # /maverick-single - for worktrees
+│   ├── senior-architect.md   # /senior-architect - architecture
 │   ├── senior-frontend.md    # /senior-frontend - React/Next.js
 │   ├── senior-backend.md     # /senior-backend - Go/microservices
-│   └── senior-qa.md          # /senior-qa - testes e qualidade
-├── templates/                # Templates de CLAUDE.md
-│   └── linear-figma.md       # Workflow Linear + Figma
-└── setup.sh                  # Script de instalação
+│   └── senior-qa.md          # /senior-qa - testing and quality
+├── templates/                # CLAUDE.md templates
+│   └── linear-figma.md       # Linear + Figma workflow
+└── setup.sh                  # Installation script
 ```
 
-## MCP Servers Disponíveis
+## MCP Servers
 
-### Globais
-- **serena** - Agente de código inteligente
+### Global
+- **serena** - Intelligent code agent
 
-### Por Projeto
-- **figma** - Integração com Figma (design)
-- **linear** - Integração com Linear (tasks)
-- **chrome-devtools** - DevTools do Chrome
-- **basic-memory** - Memória persistente
+### Per Project
+- **figma** - Figma integration (design)
+- **linear** - Linear integration (tasks)
+- **chrome-devtools** - Chrome DevTools
+- **basic-memory** - Persistent memory
 
-## Instalação
+## Installation
 
-### Rápida
+### Quick
 ```bash
 ./setup.sh
 ```
 
 ### Manual
 
-1. Copie os MCPs globais:
+1. Copy global MCPs:
 ```bash
-# Adicione ao seu ~/.claude/settings.json na chave "mcpServers"
+# Add to your ~/.claude/settings.json under "mcpServers"
 cat mcp-servers/global.json
 ```
 
-2. Para projetos específicos, adicione ao settings.json do projeto:
+2. For specific projects, add to project settings:
 ```bash
 cat mcp-servers/project.json
 ```
 
-3. Copie o template de CLAUDE.md para seu projeto:
+3. Copy the CLAUDE.md template to your project:
 ```bash
 cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
 ```
 
-## MCPs Utilizados
+## MCPs Used
 
-| MCP | Tipo | Uso |
+| MCP | Type | Use |
 |-----|------|-----|
 | Figma | HTTP | Design to code |
 | Linear | HTTP | Task management |
@@ -70,17 +70,11 @@ cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
 | Chrome DevTools | stdio | Browser debugging |
 | Basic Memory | stdio | Persistent memory |
 
-## Requisitos
-
-- Claude Code CLI instalado
-- Node.js (para MCPs stdio)
-- Python/uvx (para serena e basic-memory)
-
 ## Skills & Commands
 
-### Maverick - Desenvolvimento Autônomo
+### Maverick - Autonomous Development
 
-O Maverick é um workflow que coordena agentes seniores para completar tasks do Linear de ponta a ponta.
+Maverick is a workflow that coordinates senior agents to complete Linear tasks end-to-end.
 
 ```bash
 # Single ticket
@@ -90,41 +84,67 @@ O Maverick é um workflow que coordena agentes seniores para completar tasks do 
 /maverick AP-552,AP-553,AP-554
 ```
 
-**Fluxo:**
+**Flow:**
 ```
 LINEAR → ARCHITECT → [APPROVAL] → IMPLEMENT → QA → DELIVER
-           ↑
-     ÚNICO CHECKPOINT
+              ↑
+        ONLY CHECKPOINT
 ```
 
-### Agentes Seniores
+### Senior Agents
 
-| Command | Descrição |
-|---------|-----------|
-| `/senior-architect` | Análise arquitetural e design de sistemas |
-| `/senior-frontend` | Desenvolvimento React/Next.js com design system |
-| `/senior-backend` | Desenvolvimento Go/microservices |
-| `/senior-qa` | Testes, QA visual (Figma + Chrome DevTools) |
+| Command | Description |
+|---------|-------------|
+| `/senior-architect` | Architectural analysis and system design |
+| `/senior-frontend` | React/Next.js development with design system |
+| `/senior-backend` | Go/microservices development |
+| `/senior-qa` | Testing, visual QA (Figma + Chrome DevTools) |
 
-### Instalação dos Commands
+### Installing Commands
 
-Copie a pasta `commands/` e `skills/` para o `.claude/` do seu projeto:
+Copy the `commands/` and `skills/` folders to your project's `.claude/`:
 
 ```bash
 cp -r commands/ /path/to/project/.claude/
 cp -r skills/ /path/to/project/.claude/
 ```
 
+## Critical Rules
+
+### No Regressions Policy
+
+All agents follow a strict **NO REGRESSIONS** policy:
+
+1. **Never remove or modify existing functionality** without explicit user authorization
+2. **Always preserve existing tests** - never delete or skip tests
+3. **Review changes for side effects** - check if changes affect other parts of the codebase
+4. **QA phase must verify** - no regressions in existing features before delivery
+5. **When in doubt, ask** - if a change might cause regression, stop and ask for authorization
+
+### Before Any Delivery
+
+The QA phase includes mandatory regression checks:
+- Run existing test suites
+- Verify unchanged functionality still works
+- Check for unintended side effects
+- Compare before/after behavior
+
 ## Ralph Loop (Plugin)
 
-O Maverick funciona melhor com o plugin `ralph-loop` para execução autônoma:
+Maverick works best with the `ralph-loop` plugin for autonomous execution:
 
 ```bash
 /ralph-loop:ralph-loop "/maverick AP-552" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 ```
 
-O plugin está disponível no marketplace oficial do Claude Code.
+The plugin is available in the official Claude Code marketplace.
 
-## Licença
+## Requirements
+
+- Claude Code CLI installed
+- Node.js (for stdio MCPs)
+- Python/uvx (for serena and basic-memory)
+
+## License
 
 MIT

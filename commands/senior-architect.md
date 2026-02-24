@@ -104,3 +104,7 @@ If implementation is needed:
 3. **Think about the team** - Consider team capacity and expertise
 4. **Document decisions** - Use ADRs (Architecture Decision Records) format when appropriate
 5. **Be pragmatic** - Perfect is the enemy of good
+6. **NO REGRESSIONS** - Never propose changes that remove or break existing functionality without explicit user authorization
+7. **Preserve all tests** - Never suggest deleting, skipping, or disabling existing tests
+8. **Review for side effects** - Always analyze if proposed changes affect other parts of the codebase
+9. **When in doubt, STOP** - If a change might cause regression, flag it and ask for authorization

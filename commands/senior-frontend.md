@@ -160,3 +160,7 @@ For review tasks:
 4. **Accessibility** - Proper ARIA, keyboard navigation
 5. **Mobile first** - Responsive design by default
 6. **Test coverage** - Write tests for critical logic
+7. **NO REGRESSIONS** - Never remove or modify existing functionality without explicit user authorization
+8. **Preserve all tests** - Never delete, skip, or disable existing tests
+9. **Review for side effects** - Check if changes affect other parts of the codebase
+10. **When in doubt, STOP** - If a change might cause regression, stop and ask for authorization
