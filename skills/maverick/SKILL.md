@@ -282,7 +282,19 @@ Present plan to user. **DO NOT proceed without explicit approval.**
 
 ## Phase 3: Branch Setup
 
-### Step 3.1 - Create Feature Branch
+### Step 3.1 - Get Branch Name from Linear
+
+**ALWAYS use the branch name suggested by Linear.** When viewing a task in Linear,
+it shows the suggested branch name (e.g., `igor/ap-567-refactor-line-items-section`).
+
+To get the branch name:
+```
+mcp__linear__get_issue with id: "$ARGUMENTS.ticket"
+```
+
+Look for the `branchName` field in the response.
+
+### Step 3.2 - Create Feature Branch
 
 ```bash
 # Determine correct repository
@@ -291,7 +303,14 @@ Present plan to user. **DO NOT proceed without explicit approval.**
 
 git checkout main
 git pull origin main
-git checkout -b feature/$(echo "$ARGUMENTS.ticket" | tr '[:upper:]' '[:lower:]')
+
+# ALWAYS use Linear's suggested branch name
+git checkout -b <linear-suggested-branch-name>
+```
+
+Example: If Linear suggests `igor/ap-567-refactor-line-items-section`, use exactly that:
+```bash
+git checkout -b igor/ap-567-refactor-line-items-section
 ```
 
 ---
@@ -561,3 +580,4 @@ Use TaskList to track progress:
 8. **Never skip phases** - follow the flow
 9. **Make decisions autonomously** - document them, don't ask
 10. **Track time** for report scheduling
+11. **Always use Linear's branch name** - each task has a suggested branch name in Linear, always create branches using that exact name
