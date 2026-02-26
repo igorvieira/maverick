@@ -66,6 +66,7 @@ cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
 |-----|------|-----|
 | Figma | HTTP | Design to code |
 | Linear | HTTP | Task management |
+| GitHub | stdio | GitHub API (PRs, issues, repos) |
 | Serena | stdio | Code agent |
 | Chrome DevTools | stdio | Browser debugging |
 | Basic Memory | stdio | Persistent memory |
