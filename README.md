@@ -100,6 +100,12 @@ LINEAR → ARCHITECT → [APPROVAL] → IMPLEMENT → QA → DELIVER
 | `/senior-backend` | Go/microservices development |
 | `/senior-qa` | Testing, visual QA (Figma + Chrome DevTools) |
 
+### Review Tools
+
+| Command | Description |
+|---------|-------------|
+| `/review-resolver` | Interactive PR review comment handler with regression protection |
+
 ### Installing Commands
 
 Copy the `commands/` and `skills/` folders to your project's `.claude/`:
