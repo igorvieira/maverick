@@ -27,5 +27,8 @@ jobs:
           chmod +x "$HOME/.local/bin/claude"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: Run setup.sh
+        run: bash setup.sh
+
       - name: Run tests
         run: bash test_setup.sh
