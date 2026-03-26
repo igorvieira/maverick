@@ -50,6 +50,7 @@ if [ -f "$SETTINGS_FILE" ]; then
     echo "$MERGED" > "$SETTINGS_FILE"
 else
     # Create new settings.json
+    mkdir -p "$CLAUDE_DIR"
     echo "$GLOBAL_MCPS" | jq '{mcpServers: .mcpServers}' > "$SETTINGS_FILE"
 fi
 
