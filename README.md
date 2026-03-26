@@ -1,6 +1,8 @@
-# Claude Code Setup
-
+# Maverick
 My personal Claude Code configuration with MCPs, skills, commands, and workflows.
+
+<img width="409" height="610" alt="image-removebg-preview" src="https://github.com/user-attachments/assets/9f04c2e5-616f-4508-8004-f817f5bdc465" />
+
 
 ## Structure
 
