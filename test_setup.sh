@@ -161,6 +161,12 @@ assert_json_key "serena has args field" "$GLOBAL" ".mcpServers.serena.args"
 SERENA_CMD=$(jq -r '.mcpServers.serena.command' "$GLOBAL")
 assert_eq "serena command is 'uvx'" "uvx" "$SERENA_CMD"
 
+assert_json_key "figma server is defined" "$GLOBAL" ".mcpServers.figma"
+assert_json_key "figma has url field" "$GLOBAL" ".mcpServers.figma.url"
+
+FIGMA_TYPE=$(jq -r '.mcpServers.figma.type' "$GLOBAL")
+assert_eq "figma type is 'http'" "http" "$FIGMA_TYPE"
+
 # ----------------------------------------------------------
 echo ""
 echo -e "${YELLOW}5. Project MCP structure${NC}"
@@ -193,6 +199,8 @@ if [ -f "$SETTINGS_RESULT" ]; then
 
     RESULT_CMD=$(jq -r '.mcpServers.serena.command' "$SETTINGS_RESULT")
     assert_eq "serena command in settings is 'uvx'" "uvx" "$RESULT_CMD"
+
+    assert_json_key "figma was added to settings" "$SETTINGS_RESULT" ".mcpServers.figma"
 else
     TOTAL=$((TOTAL + 1))
     echo -e "  ${RED}✗${NC} setup.sh did not create settings.json (exit code: $SETUP_EXIT)"
