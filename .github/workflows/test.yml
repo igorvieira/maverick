@@ -1,0 +1,31 @@
+name: Test Setup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Stub claude CLI for CI
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          echo '#!/bin/bash' > "$HOME/.local/bin/claude"
+          echo 'echo "claude stub"' >> "$HOME/.local/bin/claude"
+          chmod +x "$HOME/.local/bin/claude"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run tests
+        run: bash test_setup.sh
