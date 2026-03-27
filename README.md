@@ -104,7 +104,7 @@ LINEAR → ARCHITECT → [APPROVAL] → IMPLEMENT → QA → DELIVER
 | Command | Description |
 |---------|-------------|
 | `/senior-architect` | Architectural analysis and system design |
-| `/senior-frontend` | React/Next.js development with design system |
+| `/senior-frontend` | React/Next.js frontend development |
 | `/senior-backend` | Go/microservices development |
 | `/senior-qa` | Testing, visual QA (Figma + Chrome DevTools) |
 

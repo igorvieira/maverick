@@ -79,15 +79,15 @@ Each worktree runs independently:
 
 ```bash
 # Terminal 1
-cd <project-root>/worktrees/AP-552
+cd $WORKTREE_BASE/AP-552
 /ralph-loop:ralph-loop "/maverick-single AP-552" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 
 # Terminal 2
-cd <project-root>/worktrees/AP-553
+cd $WORKTREE_BASE/AP-553
 /ralph-loop:ralph-loop "/maverick-single AP-553" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 
 # Terminal 3
-cd <project-root>/worktrees/AP-554
+cd $WORKTREE_BASE/AP-554
 /ralph-loop:ralph-loop "/maverick-single AP-554" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 ```
 
@@ -298,7 +298,7 @@ Look for the `branchName` field in the response.
 
 ```bash
 # Determine correct repository
-# Frontend: <frontend-app>
+# Frontend repository
 # Backend: appropriate svc-* directory
 
 git checkout main
@@ -340,7 +340,7 @@ Document:
 **Step 4.2 - Write Code**
 
 Rules:
-- ALWAYS use `the project's design system` components
+- ALWAYS use the project's design system components
 - Use `cn()` for class merging
 - Use `tv()` for variants
 - Follow existing patterns in codebase
@@ -348,7 +348,7 @@ Rules:
 
 **Step 4.3 - Verify TypeScript**
 ```bash
-cd apps/<app> && npx tsc --noEmit
+npx tsc --noEmit
 ```
 
 ---

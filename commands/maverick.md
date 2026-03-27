@@ -43,7 +43,7 @@ TICKETS=($ARGUMENTS.tickets)  # e.g., AP-552,AP-553,AP-554
 ### Step 2: Determine Repository
 
 Identify the target repository based on task types:
-- **Frontend tasks**: `<project-root>/<repo>`
+- **Frontend tasks**: `<project-root>/<frontend-app>`
 - **Backend tasks**: `<project-root>/svc-<service-name>`
 
 ### Step 3: Setup Worktrees
@@ -76,15 +76,15 @@ Each ticket runs in its own worktree with independent Ralph loop:
 
 ```bash
 # Terminal 1 - Ticket 1
-cd <project-root>/worktrees/AP-552
+cd $WORKTREE_BASE/AP-552
 /ralph-loop:ralph-loop "/maverick-single AP-552" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 
 # Terminal 2 - Ticket 2
-cd <project-root>/worktrees/AP-553
+cd $WORKTREE_BASE/AP-553
 /ralph-loop:ralph-loop "/maverick-single AP-553" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 
 # Terminal 3 - Ticket 3
-cd <project-root>/worktrees/AP-554
+cd $WORKTREE_BASE/AP-554
 /ralph-loop:ralph-loop "/maverick-single AP-554" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 ```
 
@@ -92,7 +92,7 @@ cd <project-root>/worktrees/AP-554
 
 ```bash
 for TICKET in ${TICKETS[@]}; do
-  git -C $REPO_BASE worktree remove <project-root>/worktrees/$TICKET
+  git -C $REPO_BASE worktree remove $WORKTREE_BASE/$TICKET
 done
 ```
 

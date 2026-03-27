@@ -5,7 +5,7 @@ arguments:
     description: "PR number or URL (e.g., 123 or https://github.com/org/repo/pull/123)"
     required: true
   - name: repo
-    description: "Repository path relative to project root (e.g., <frontend-app>, svc-payments). Auto-detected from PR URL if omitted."
+    description: "Repository path relative to project root (e.g., frontend, svc-payments). Auto-detected from PR URL if omitted."
     required: false
 user_invocable: true
 ---
@@ -24,7 +24,7 @@ If `$ARGUMENTS.repo` is provided, use it. Otherwise, detect from current directo
 
 ```bash
 # If repo argument provided
-REPO_PATH="<project-root>/$ARGUMENTS.repo"
+REPO_PATH="$(git rev-parse --show-toplevel)/$ARGUMENTS.repo"
 
 # Otherwise, detect from current git remote
 REPO_PATH=$(pwd)
