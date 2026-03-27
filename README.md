@@ -4,8 +4,8 @@ My personal Claude Code configuration with MCPs, skills, commands, and workflows
 [![Test Setup](https://github.com/igorvieira/maverick/actions/workflows/test.yml/badge.svg)](https://github.com/igorvieira/maverick/actions/workflows/test.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+<img width="702" height="300" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/f42be722-0cdb-4961-9a70-624bb87a0a4f" />
 
-<img width="409" height="610" alt="image-removebg-preview" src="https://github.com/user-attachments/assets/9f04c2e5-616f-4508-8004-f817f5bdc465" />
 
 ## Structure
 
