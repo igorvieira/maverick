@@ -2,7 +2,7 @@
 description: "Autonomous end-to-end development workflow with senior agents"
 arguments:
   - name: tickets
-    description: "Linear ticket IDs - single (AP-552) or multiple (AP-552,AP-553,AP-554)"
+    description: "Linear ticket IDs (AP-552 or AP-552,AP-553) OR --local with task descriptions"
     required: true
 user_invocable: true
 ---
@@ -13,13 +13,109 @@ Execute complete development cycle for: **$ARGUMENTS.tickets**
 
 ## Mode Detection
 
-Parse tickets to determine mode:
-- **Single ticket**: `AP-552` → Standard execution
-- **Multiple tickets**: `AP-552,AP-553,AP-554` → Parallel execution with worktrees
+Parse input to determine mode:
+- **Linear ticket**: `AP-552` → Fetch from Linear, standard execution
+- **Multiple Linear tickets**: `AP-552,AP-553,AP-554` → Parallel execution with worktrees
+- **Local mode**: `--local "task description"` → No Linear, work from provided description
+- **Local multi**: `--local "task1" "task2" "task3"` → Multiple local tasks, sequential execution
 
 ---
 
-## Single Ticket Mode
+## Local Mode (`--local`)
+
+When `--local` is detected, skip Linear entirely. The user provides the task description directly.
+
+### Single Local Task
+
+```
+/maverick --local "Add dark mode toggle to the settings page"
+```
+
+### Multiple Local Tasks
+
+```
+/maverick --local "Fix login form validation" "Add loading spinner to submit button" "Refactor auth hook"
+```
+
+### Local Workflow
+
+```
+DESCRIBE → ARCHITECT → BRANCH → IMPLEMENT → QA → DELIVER
+```
+
+### Phase 1: Parse Task Description
+
+Extract from the provided text:
+- **Goal**: What needs to be done
+- **Scope**: Which parts of the codebase are affected
+- **Task type**: FRONTEND, BACKEND, or FULLSTACK (infer from description)
+- **Acceptance criteria**: Derive from the goal
+
+If the description is vague, use the codebase to infer context:
+- Search for related files and patterns
+- Identify the area of the codebase affected
+- Build a clear task definition from the description + code context
+
+### Phase 2: Architecture (senior-architect)
+
+Same as Linear mode - analyze and plan:
+- Files to create/modify
+- Components/services needed
+- Implementation steps
+
+**Wait for user approval before proceeding.**
+
+### Phase 3: Create Branch
+
+```bash
+# Generate branch name from task description
+# e.g., "Add dark mode toggle" → feature/add-dark-mode-toggle
+git checkout main
+git pull origin main
+git checkout -b feature/<slugified-description>
+```
+
+### Phase 4-6: Implement → QA → Deliver
+
+Same as Linear mode (see below).
+
+### Local Completion
+
+```
+MAVERICK_COMPLETE
+
+Task: <task description summary>
+Branch: feature/<branch-name>
+Summary: <bullets>
+Status: Ready for PR
+```
+
+### Multiple Local Tasks
+
+For multiple `--local` tasks, execute **sequentially** (each on its own branch):
+
+```
+Task 1: feature/fix-login-validation → DONE
+Task 2: feature/add-loading-spinner → DONE
+Task 3: feature/refactor-auth-hook → DONE
+```
+
+Output at the end:
+
+```
+MAVERICK_LOCAL_COMPLETE
+
+Completed Tasks:
+- "Fix login form validation" → feature/fix-login-validation
+- "Add loading spinner" → feature/add-loading-spinner
+- "Refactor auth hook" → feature/refactor-auth-hook
+
+All branches pushed and ready for PR.
+```
+
+---
+
+## Linear Mode (Single Ticket)
 
 For one ticket, execute standard workflow:
 
@@ -29,7 +125,7 @@ For one ticket, execute standard workflow:
 
 ---
 
-## Multiple Tickets Mode (Parallel with Worktrees)
+## Linear Mode (Multiple Tickets - Parallel with Worktrees)
 
 When multiple tickets are provided (comma-separated), execute in parallel using git worktrees.
 
@@ -98,17 +194,21 @@ done
 
 ---
 
-## Single Ticket Workflow
+## Shared Workflow (Linear & Local)
 
 ```
-LINEAR → ARCHITECT → BRANCH → IMPLEMENT → QA → DELIVER
+[TASK SOURCE] → ARCHITECT → BRANCH → IMPLEMENT → QA → DELIVER
 ```
 
 ### Phase 1: Fetch Task
 
+**Linear mode:**
 ```
 mcp__linear__get_issue with id: "<ticket>"
 ```
+
+**Local mode:**
+Parse the provided task description directly.
 
 Identify:
 - Requirements and acceptance criteria
@@ -126,8 +226,16 @@ Analyze and plan:
 
 ### Phase 3: Create Branch (or use worktree branch)
 
+**Linear mode:**
 ```bash
-git checkout -b feature/$(echo "<ticket>" | tr '[:upper:]' '[:lower:]')
+# Use branch name from Linear if available
+git checkout -b <linear-suggested-branch-name>
+```
+
+**Local mode:**
+```bash
+# Generate from task description
+git checkout -b feature/<slugified-description>
 ```
 
 ### Phase 4: Implement
@@ -160,8 +268,8 @@ git checkout -b feature/$(echo "<ticket>" | tr '[:upper:]' '[:lower:]')
 
 ```bash
 git add <files>
-git commit -m "feat(<ticket>): <description>"
-git push -u origin feature/<ticket>
+git commit -m "feat(<ticket-or-scope>): <description>"
+git push -u origin <branch-name>
 ```
 
 Generate summary in English with bullets:
@@ -173,7 +281,7 @@ Generate summary in English with bullets:
 
 ## Completion
 
-### Single Ticket
+### Single Ticket (Linear)
 ```
 MAVERICK_COMPLETE
 
@@ -182,16 +290,26 @@ Summary: <bullets>
 Status: Ready for PR
 ```
 
-### Multiple Tickets
+### Multiple Tickets (Linear)
 ```
 MAVERICK_PARALLEL_COMPLETE
 
 Completed Tickets:
-- AP-552: feature/ap-552 ✅
-- AP-553: feature/ap-553 ✅
-- AP-554: feature/ap-554 ✅
+- AP-552: feature/ap-552
+- AP-553: feature/ap-553
+- AP-554: feature/ap-554
 
 All branches pushed and ready for PR.
+```
+
+### Local Task
+```
+MAVERICK_COMPLETE
+
+Task: <description>
+Branch: feature/<branch-name>
+Summary: <bullets>
+Status: Ready for PR
 ```
 
 ---
@@ -200,8 +318,10 @@ All branches pushed and ready for PR.
 
 | Command | Description |
 |---------|-------------|
-| `/maverick AP-552` | Single ticket, standard flow |
-| `/maverick AP-552,AP-553,AP-554` | Multiple tickets, parallel worktrees |
+| `/maverick AP-552` | Single Linear ticket |
+| `/maverick AP-552,AP-553,AP-554` | Multiple Linear tickets, parallel worktrees |
+| `/maverick --local "description"` | Single local task, no Linear |
+| `/maverick --local "task1" "task2"` | Multiple local tasks, sequential |
 
 ---
 
@@ -221,7 +341,7 @@ All branches pushed and ready for PR.
 
 ### Report Format
 ```
-📍 [HH:MM] Phase: X | Working on: <current task>
+[HH:MM] Phase: X | Working on: <current task>
 ```
 
 ---
@@ -235,5 +355,6 @@ All branches pushed and ready for PR.
 5. No Co-Authored-By
 6. Summary in English
 7. Worktrees are isolated - no conflicts
-8. Each ticket = independent branch
+8. Each ticket/task = independent branch
 9. Make decisions autonomously - document, don't ask
+10. **Local mode**: no Linear calls, derive everything from description + codebase

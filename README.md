@@ -83,21 +83,27 @@ cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
 
 ### Maverick - Autonomous Development
 
-Maverick is a workflow that coordinates senior agents to complete Linear tasks end-to-end.
+Maverick is a workflow that coordinates senior agents to complete tasks end-to-end. Works with Linear tickets or standalone local tasks.
 
 ```bash
-# Single ticket
+# Single Linear ticket
 /maverick AP-552
 
-# Multiple tickets (parallel worktrees)
+# Multiple Linear tickets (parallel worktrees)
 /maverick AP-552,AP-553,AP-554
+
+# Local mode - no Linear needed
+/maverick --local "Add dark mode toggle to settings page"
+
+# Multiple local tasks
+/maverick --local "Fix login validation" "Add loading spinner"
 ```
 
 **Flow:**
 ```
-LINEAR → ARCHITECT → [APPROVAL] → IMPLEMENT → QA → DELIVER
-              ↑
-        ONLY CHECKPOINT
+[LINEAR or LOCAL] → ARCHITECT → [APPROVAL] → IMPLEMENT → QA → DELIVER
+                                    ↑
+                              ONLY CHECKPOINT
 ```
 
 ### Senior Agents

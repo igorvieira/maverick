@@ -2,13 +2,13 @@
 name: maverick
 description: >
   Autonomous end-to-end development workflow. Orchestrates senior agents (architect, frontend, backend, qa)
-  to complete Linear tasks from planning to PR. Supports single ticket or multiple parallel tickets with
-  git worktrees. Integrates with Linear MCP, Figma MCP, and ralph-loop plugin.
+  to complete tasks from planning to PR. Supports Linear tickets, multiple parallel tickets with
+  git worktrees, or local mode (--local) for tasks without Linear.
   Only ONE approval checkpoint (after architect planning), then fully autonomous with progress reports.
 user_invocable: true
 arguments:
   - name: tickets
-    description: "Linear ticket(s) - single (AP-552) or multiple comma-separated (AP-552,AP-553,AP-554)"
+    description: "Linear ticket(s) (AP-552 or AP-552,AP-553) OR --local \"task description\" for local tasks"
     required: true
 ---
 
@@ -18,14 +18,14 @@ Autonomous development workflow for **$ARGUMENTS.tickets** using coordinated sen
 
 ## Execution Modes
 
-### Single Ticket
+### Single Ticket (Linear)
 ```bash
 /maverick AP-552
 # or with Ralph Loop:
 /ralph-loop:ralph-loop "/maverick AP-552" --max-iterations 30 --completion-promise "MAVERICK_COMPLETE"
 ```
 
-### Multiple Tickets (Parallel Worktrees)
+### Multiple Tickets (Linear - Parallel Worktrees)
 ```bash
 /maverick AP-552,AP-553,AP-554
 ```
@@ -35,6 +35,21 @@ When multiple tickets are provided, Maverick will:
 2. Launch parallel Ralph loops
 3. Each ticket executes independently
 4. No conflicts between tickets
+
+### Local Mode (No Linear)
+```bash
+# Single task
+/maverick --local "Add dark mode toggle to settings page"
+
+# Multiple tasks (sequential)
+/maverick --local "Fix login validation" "Add loading spinner" "Refactor auth hook"
+```
+
+When `--local` is used:
+- No Linear API calls are made
+- Task description is parsed directly from the input
+- Branch names are generated from the description (e.g., `feature/add-dark-mode-toggle`)
+- Everything else (architect, implement, QA, deliver) works the same
 
 ## Workflow Overview
 
@@ -200,13 +215,20 @@ Instead:
 
 ## Phase 1: Task Acquisition
 
-### Step 1.1 - Fetch Linear Task
+### Step 1.1a - Linear Mode: Fetch Task
 ```
 mcp__linear__get_issue with id: "$ARGUMENTS.ticket"
 ```
 
+### Step 1.1b - Local Mode: Parse Description
+
+When `--local` is detected, skip Linear entirely:
+- Parse the task description provided by the user
+- Search the codebase for related files and patterns to build context
+- Derive acceptance criteria from the goal
+
 Extract and document:
-- **Title**: Task name
+- **Title**: Task name (from Linear or user description)
 - **Description**: Full requirements
 - **Acceptance Criteria**: What defines "done"
 - **Figma Links**: Design references (if any)
@@ -282,35 +304,31 @@ Present plan to user. **DO NOT proceed without explicit approval.**
 
 ## Phase 3: Branch Setup
 
-### Step 3.1 - Get Branch Name from Linear
+### Step 3.1 - Get Branch Name
 
-**ALWAYS use the branch name suggested by Linear.** When viewing a task in Linear,
-it shows the suggested branch name (e.g., `igor/ap-567-refactor-line-items-section`).
-
-To get the branch name:
+**Linear mode:** ALWAYS use the branch name suggested by Linear.
 ```
 mcp__linear__get_issue with id: "$ARGUMENTS.ticket"
 ```
-
 Look for the `branchName` field in the response.
+
+**Local mode:** Generate branch name from the task description.
+```bash
+# "Add dark mode toggle" → feature/add-dark-mode-toggle
+# Slugify: lowercase, replace spaces with hyphens, remove special chars, max 50 chars
+```
 
 ### Step 3.2 - Create Feature Branch
 
 ```bash
-# Determine correct repository
-# Frontend repository
-# Backend: appropriate svc-* directory
-
 git checkout main
 git pull origin main
 
-# ALWAYS use Linear's suggested branch name
+# Linear: use suggested branch name
 git checkout -b <linear-suggested-branch-name>
-```
 
-Example: If Linear suggests `igor/ap-567-refactor-line-items-section`, use exactly that:
-```bash
-git checkout -b igor/ap-567-refactor-line-items-section
+# Local: use generated branch name
+git checkout -b feature/<slugified-description>
 ```
 
 ---
