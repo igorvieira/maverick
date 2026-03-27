@@ -100,6 +100,7 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 ```
 
 **Flow:**
+
 <img width="1392" height="451" alt="image" src="https://github.com/user-attachments/assets/f2168f4d-2b27-4732-be2c-d14d6f8088a0" />
 
 
