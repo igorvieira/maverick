@@ -1,7 +1,7 @@
 # Maverick
 My personal Claude Code configuration with MCPs, skills, commands, and workflows.
 
-[![Test Setup](https://github.com/igorvieira/claude/actions/workflows/test.yml/badge.svg)](https://github.com/igorvieira/claude/actions/workflows/test.yml)
+[![Test Setup](https://github.com/igorvieira/maverick/actions/workflows/test.yml/badge.svg)](https://github.com/igorvieira/maverick/actions/workflows/test.yml)
 
 <img width="409" height="610" alt="image-removebg-preview" src="https://github.com/user-attachments/assets/9f04c2e5-616f-4508-8004-f817f5bdc465" />
 
@@ -9,9 +9,9 @@ My personal Claude Code configuration with MCPs, skills, commands, and workflows
 ## Structure
 
 ```
-claude/
+maverick/
 ├── mcp-servers/              # MCP server configurations
-│   ├── global.json           # Global MCPs (all projects)
+│   ├── global.json           # Global MCPs (serena, figma)
 │   └── project.json          # Per-project MCPs
 ├── skills/                   # Custom skills
 │   └── maverick/             # Autonomous development workflow
@@ -19,23 +19,26 @@ claude/
 ├── commands/                 # Commands (slash commands)
 │   ├── maverick.md           # /maverick - autonomous development
 │   ├── maverick-single.md    # /maverick-single - for worktrees
+│   ├── review-resolver.md    # /review-resolver - PR review handler
 │   ├── senior-architect.md   # /senior-architect - architecture
 │   ├── senior-frontend.md    # /senior-frontend - React/Next.js
 │   ├── senior-backend.md     # /senior-backend - Go/microservices
 │   └── senior-qa.md          # /senior-qa - testing and quality
 ├── templates/                # CLAUDE.md templates
 │   └── linear-figma.md       # Linear + Figma workflow
-└── setup.sh                  # Installation script
+├── setup.sh                  # Installation script
+└── test_setup.sh             # Test suite for setup.sh
 ```
 
 ## MCP Servers
 
 ### Global
 - **serena** - Intelligent code agent
+- **figma** - Figma integration (design)
 
 ### Per Project
-- **figma** - Figma integration (design)
 - **linear** - Linear integration (tasks)
+- **github** - GitHub API (PRs, issues, repos)
 - **chrome-devtools** - Chrome DevTools
 - **basic-memory** - Persistent memory
 
