@@ -277,6 +277,20 @@ Generate summary in English with bullets:
 - What was done
 - How to test
 
+Create PR using `gh pr create`.
+
+### Phase 7: Schedule PR Review Check
+
+After the PR is created, schedule a check after 10 minutes to verify if there are any review comments:
+
+1. Use `/loop 10m` or `CronCreate` to schedule a single check
+2. The check should:
+   - Fetch PR review comments using `gh api repos/{owner}/{repo}/pulls/{pr_number}/comments`
+   - Fetch PR reviews using `gh pr view {pr_number} --json reviews`
+   - If there are unresolved comments or CHANGES_REQUESTED, notify the user
+   - If no comments, report that the PR is clear
+3. Use the `/review-resolver` skill if actionable comments are found, presenting them to the user for resolution
+
 ---
 
 ## Completion

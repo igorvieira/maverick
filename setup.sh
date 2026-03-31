@@ -68,6 +68,29 @@ fi
 
 echo "✅ Dependencies verified"
 
+# Configure notification sound (macOS only)
+echo ""
+echo "🔔 Configuring notification sound..."
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    SOUND_FILE="/System/Library/Sounds/Funk.aiff"
+    if [ -f "$SOUND_FILE" ]; then
+        EXISTING=$(cat "$SETTINGS_FILE")
+        HAS_HOOKS=$(echo "$EXISTING" | jq 'has("hooks")')
+        if [ "$HAS_HOOKS" = "false" ]; then
+            MERGED=$(echo "$EXISTING" | jq '.hooks.Notification = [{"hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Funk.aiff &", "timeout": 5}]}]')
+            echo "$MERGED" > "$SETTINGS_FILE"
+            echo "✅ Sound notification configured (Funk)"
+        else
+            echo "⏭ Hooks already configured, skipping sound setup"
+        fi
+    else
+        echo "⚠ System sound not found, skipping"
+    fi
+else
+    echo "⏭ Not macOS, skipping sound setup"
+fi
+
 # Summary
 echo ""
 echo "🎉 Setup complete!"

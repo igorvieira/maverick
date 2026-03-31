@@ -262,7 +262,7 @@ else
     FAILED=$((FAILED + 1))
 fi
 
-for cmd in maverick.md senior-architect.md senior-backend.md senior-frontend.md senior-qa.md review-resolver.md maverick-single.md; do
+for cmd in maverick.md senior-architect.md senior-backend.md senior-frontend.md senior-security.md senior-qa.md review-resolver.md maverick-single.md; do
     assert_file_exists "command: $cmd" "$COMMANDS_DIR/$cmd"
 done
 

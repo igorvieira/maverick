@@ -4,8 +4,53 @@ My personal Claude Code configuration with MCPs, skills, commands, and workflows
 [![Test Setup](https://github.com/igorvieira/maverick/actions/workflows/test.yml/badge.svg)](https://github.com/igorvieira/maverick/actions/workflows/test.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-<img width="702" height="300" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/f42be722-0cdb-4961-9a70-624bb87a0a4f" />
-
+```
+                    ╔══════════════════════════════════════╗
+                    ║           M A V E R I C K            ║
+                    ║      Autonomous Dev Workflow          ║
+                    ╚═══════════════╤══════════════════════╝
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │         TASK SOURCE            │
+                    │   Linear Ticket  or  --local   │
+                    └───────────────┬───────────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │      SENIOR ARCHITECT          │
+                    │  Analyze scope, plan files,    │
+                    │  define implementation steps    │
+                    └───────────────┬───────────────┘
+                                    │
+                          ┌─────────▼─────────┐
+                          │    USER APPROVAL   │
+                          │  (only checkpoint) │
+                          └─────────┬─────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+  ┌───────────▼──────────┐ ┌───────▼────────┐ ┌─────────▼──────────┐
+  │  SENIOR FRONTEND     │ │ SENIOR BACKEND │ │  SENIOR SECURITY   │
+  │  React, Next.js,     │ │ Go, gRPC,      │ │  Vuln scan, deps,  │
+  │  design system       │ │ microservices  │ │  secrets, OWASP    │
+  └───────────┬──────────┘ └───────┬────────┘ └─────────┬──────────┘
+              │                     │                     │
+              └─────────────────────┼─────────────────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │          SENIOR QA             │
+                    │  Tests, regression check,      │
+                    │  Figma compliance, coverage     │
+                    └───────────────┬───────────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │           DELIVER              │
+                    │  Commit, push, create PR       │
+                    └───────────────┬───────────────┘
+                                    │
+                              ┌─────▼─────┐
+                              │   DONE    │
+                              └───────────┘
+```
 
 ## Structure
 
@@ -24,6 +69,7 @@ maverick/
 │   ├── senior-architect.md   # /senior-architect - architecture
 │   ├── senior-frontend.md    # /senior-frontend - React/Next.js
 │   ├── senior-backend.md     # /senior-backend - Go/microservices
+│   ├── senior-security.md    # /senior-security - vulnerability scanning
 │   └── senior-qa.md          # /senior-qa - testing and quality
 ├── templates/                # CLAUDE.md templates
 │   └── linear-figma.md       # Linear + Figma workflow
@@ -100,9 +146,11 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 ```
 
 **Flow:**
-
-<img width="1392" height="451" alt="image" src="https://github.com/user-attachments/assets/f2168f4d-2b27-4732-be2c-d14d6f8088a0" />
-
+```
+[LINEAR or LOCAL] → ARCHITECT → [APPROVAL] → IMPLEMENT → SECURITY → QA → DELIVER
+                                    ↑
+                              ONLY CHECKPOINT
+```
 
 ### Senior Agents
 
@@ -111,6 +159,7 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 | `/senior-architect` | Architectural analysis and system design |
 | `/senior-frontend` | React/Next.js frontend development |
 | `/senior-backend` | Go/microservices development |
+| `/senior-security` | Vulnerability scanning, dependency audit, secrets detection |
 | `/senior-qa` | Testing, visual QA (Figma + Chrome DevTools) |
 
 ### Review Tools
