@@ -147,12 +147,7 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 /maverick --local "Fix login validation" "Add loading spinner"
 ```
 
-**Flow:**
-```
-[LINEAR or LOCAL] → ARCHITECT → [APPROVAL] → IMPLEMENT → SECURITY → QA → DELIVER
-                                    ↑
-                              ONLY CHECKPOINT
-```
+**See the flow diagram at the top of this README.**
 
 ### Senior Agents
 
