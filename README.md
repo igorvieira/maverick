@@ -6,54 +6,6 @@ My personal Claude Code configuration with MCPs, skills, commands, and workflows
 
 <img width="702" height="300" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/f42be722-0cdb-4961-9a70-624bb87a0a4f" />
 
-```
-                    ╔══════════════════════════════════════╗
-                    ║           M A V E R I C K            ║
-                    ║      Autonomous Dev Workflow          ║
-                    ╚═══════════════╤══════════════════════╝
-                                    │
-                    ┌───────────────┴───────────────┐
-                    │         TASK SOURCE            │
-                    │   Linear Ticket  or  --local   │
-                    └───────────────┬───────────────┘
-                                    │
-                    ┌───────────────▼───────────────┐
-                    │      SENIOR ARCHITECT          │
-                    │  Analyze scope, plan files,    │
-                    │  define implementation steps    │
-                    └───────────────┬───────────────┘
-                                    │
-                          ┌─────────▼─────────┐
-                          │    USER APPROVAL   │
-                          │  (only checkpoint) │
-                          └─────────┬─────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-  ┌───────────▼──────────┐ ┌───────▼────────┐ ┌─────────▼──────────┐
-  │  SENIOR FRONTEND     │ │ SENIOR BACKEND │ │  SENIOR SECURITY   │
-  │  React, Next.js,     │ │ Go, gRPC,      │ │  Vuln scan, deps,  │
-  │  design system       │ │ microservices  │ │  secrets, OWASP    │
-  └───────────┬──────────┘ └───────┬────────┘ └─────────┬──────────┘
-              │                     │                     │
-              └─────────────────────┼─────────────────────┘
-                                    │
-                    ┌───────────────▼───────────────┐
-                    │          SENIOR QA             │
-                    │  Tests, regression check,      │
-                    │  Figma compliance, coverage     │
-                    └───────────────┬───────────────┘
-                                    │
-                    ┌───────────────▼───────────────┐
-                    │           DELIVER              │
-                    │  Commit, push, create PR       │
-                    └───────────────┬───────────────┘
-                                    │
-                              ┌─────▼─────┐
-                              │   DONE    │
-                              └───────────┘
-```
-
 ## Structure
 
 ```
@@ -147,7 +99,11 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 /maverick --local "Fix login validation" "Add loading spinner"
 ```
 
-**See the flow diagram at the top of this README.**
+## Flow
+
+<img width="700" height="620" alt="image" src="https://github.com/user-attachments/assets/e2bc6fe7-ae6e-4900-a06d-d76f3ea386bc" />
+
+
 
 ### Senior Agents
 
