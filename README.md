@@ -24,7 +24,8 @@ maverick/
 │   ├── senior-frontend.md    # /senior-frontend - React/Next.js
 │   ├── senior-backend.md     # /senior-backend - Go/microservices
 │   ├── senior-security.md    # /senior-security - vulnerability scanning
-│   └── senior-qa.md          # /senior-qa - testing and quality
+│   ├── senior-qa.md          # /senior-qa - testing and quality
+│   └── service-update.md     # /service-update - update repos & fix pods
 ├── templates/                # CLAUDE.md templates
 │   └── linear-figma.md       # Linear + Figma workflow
 ├── setup.sh                  # Installation script
@@ -115,10 +116,11 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 | `/senior-security` | Vulnerability scanning, dependency audit, secrets detection |
 | `/senior-qa` | Testing, visual QA (Figma + Chrome DevTools) |
 
-### Review Tools
+### DevOps Tools
 
 | Command | Description |
 |---------|-------------|
+| `/service-update` | Update all repos, diagnose and fix stuck pods/Tilt issues |
 | `/review-resolver` | Interactive PR review comment handler with regression protection |
 
 ### Installing Commands
