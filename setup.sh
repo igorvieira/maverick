@@ -36,7 +36,10 @@ choose_target() {
     echo "  2) Codex" >&2
     echo "  3) Both" >&2
     echo "" >&2
-    read -r -p "Selection [1-3]: " selection
+    if ! read -r -p "Selection [1-3]: " selection; then
+        echo "claude"
+        return
+    fi
 
     case "$selection" in
         1) echo "claude" ;;
@@ -84,7 +87,7 @@ install_claude() {
     echo ""
     echo "Configuring global MCPs..."
 
-    GLOBAL_MCPS=$(cat "$SCRIPT_DIR/mcp-servers/global.json")
+    GLOBAL_MCPS=$(cat "$SCRIPT_DIR/claude/mcp-servers/global.json")
 
     if [ -f "$CLAUDE_SETTINGS_FILE" ]; then
         EXISTING=$(cat "$CLAUDE_SETTINGS_FILE")
@@ -137,10 +140,10 @@ install_claude() {
     echo "  - figma"
     echo ""
     echo "To add per-project MCPs, copy the content from:"
-    echo "  $SCRIPT_DIR/mcp-servers/project.json"
+    echo "  $SCRIPT_DIR/claude/mcp-servers/project.json"
     echo ""
     echo "To use the CLAUDE.md template:"
-    echo "  cp $SCRIPT_DIR/templates/linear-figma.md /path/to/project/CLAUDE.md"
+    echo "  cp $SCRIPT_DIR/claude/templates/linear-figma.md /path/to/project/CLAUDE.md"
 }
 
 install_codex() {

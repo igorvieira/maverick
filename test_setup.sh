@@ -76,6 +76,17 @@ assert_json_key() {
     fi
 }
 
+create_stub_bin() {
+    local dir="$1"
+    local name="$2"
+    mkdir -p "$dir"
+    cat > "$dir/$name" <<EOF
+#!/bin/sh
+echo "$name mock"
+EOF
+    chmod +x "$dir/$name"
+}
+
 # ============================================================
 echo ""
 echo "=============================="
@@ -106,31 +117,13 @@ else
     FAILED=$((FAILED + 1))
 fi
 
-TOTAL=$((TOTAL + 1))
-if command -v claude &>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} claude CLI is installed"
-    PASSED=$((PASSED + 1))
-else
-    echo -e "  ${RED}✗${NC} claude CLI is installed"
-    FAILED=$((FAILED + 1))
-fi
-
-TOTAL=$((TOTAL + 1))
-if command -v uvx &>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} uvx is installed (needed for serena)"
-    PASSED=$((PASSED + 1))
-else
-    echo -e "  ${RED}✗${NC} uvx is installed (needed for serena)"
-    FAILED=$((FAILED + 1))
-fi
-
 # ----------------------------------------------------------
 echo ""
 echo -e "${YELLOW}2. Required files${NC}"
 
-assert_file_exists "global.json exists" "$SCRIPT_DIR/mcp-servers/global.json"
-assert_file_exists "project.json exists" "$SCRIPT_DIR/mcp-servers/project.json"
-assert_file_exists "linear-figma template exists" "$SCRIPT_DIR/templates/linear-figma.md"
+assert_file_exists "global.json exists" "$SCRIPT_DIR/claude/mcp-servers/global.json"
+assert_file_exists "project.json exists" "$SCRIPT_DIR/claude/mcp-servers/project.json"
+assert_file_exists "linear-figma template exists" "$SCRIPT_DIR/claude/templates/linear-figma.md"
 assert_file_exists "Codex AGENTS.md template exists" "$SCRIPT_DIR/codex/AGENTS.md"
 assert_file_exists "Codex config example exists" "$SCRIPT_DIR/codex/config/config.toml.example"
 assert_file_exists "Codex Maverick skill exists" "$SCRIPT_DIR/codex/skills/maverick/SKILL.md"
@@ -140,7 +133,7 @@ assert_file_exists "Codex Maverick skill metadata exists" "$SCRIPT_DIR/codex/ski
 echo ""
 echo -e "${YELLOW}3. JSON validity${NC}"
 
-for f in "$SCRIPT_DIR/mcp-servers/global.json" "$SCRIPT_DIR/mcp-servers/project.json"; do
+for f in "$SCRIPT_DIR/claude/mcp-servers/global.json" "$SCRIPT_DIR/claude/mcp-servers/project.json"; do
     fname=$(basename "$f")
     TOTAL=$((TOTAL + 1))
     if jq empty "$f" 2>/dev/null; then
@@ -156,7 +149,7 @@ done
 echo ""
 echo -e "${YELLOW}4. Global MCP structure${NC}"
 
-GLOBAL="$SCRIPT_DIR/mcp-servers/global.json"
+GLOBAL="$SCRIPT_DIR/claude/mcp-servers/global.json"
 assert_json_key "global.json has mcpServers key" "$GLOBAL" ".mcpServers"
 assert_json_key "serena server is defined" "$GLOBAL" ".mcpServers.serena"
 assert_json_key "serena has command field" "$GLOBAL" ".mcpServers.serena.command"
@@ -175,7 +168,7 @@ assert_eq "figma type is 'http'" "http" "$FIGMA_TYPE"
 echo ""
 echo -e "${YELLOW}5. Project MCP structure${NC}"
 
-PROJECT="$SCRIPT_DIR/mcp-servers/project.json"
+PROJECT="$SCRIPT_DIR/claude/mcp-servers/project.json"
 assert_json_key "project.json has mcpServers key" "$PROJECT" ".mcpServers"
 
 for server in figma linear github chrome-devtools basic-memory; do
@@ -189,9 +182,11 @@ echo -e "${YELLOW}6. Setup dry-run (isolated environment)${NC}"
 # Create isolated HOME to test setup without touching real settings
 FAKE_HOME="$TEST_DIR/home"
 mkdir -p "$FAKE_HOME/.claude"
+create_stub_bin "$FAKE_HOME/bin" "claude"
+create_stub_bin "$FAKE_HOME/bin" "uvx"
 
 # Run Claude setup with overridden HOME
-OUTPUT=$(HOME="$FAKE_HOME" bash "$SETUP_SCRIPT" claude 2>&1) || true
+OUTPUT=$(HOME="$FAKE_HOME" PATH="$FAKE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" claude 2>&1) || true
 SETUP_EXIT=$?
 
 SETTINGS_RESULT="$FAKE_HOME/.claude/settings.json"
@@ -220,6 +215,8 @@ echo -e "${YELLOW}7. Setup with existing settings (merge test)${NC}"
 
 MERGE_HOME="$TEST_DIR/merge_home"
 mkdir -p "$MERGE_HOME/.claude"
+create_stub_bin "$MERGE_HOME/bin" "claude"
+create_stub_bin "$MERGE_HOME/bin" "uvx"
 
 # Create a pre-existing settings.json with custom content
 cat > "$MERGE_HOME/.claude/settings.json" <<'EOF'
@@ -236,7 +233,7 @@ cat > "$MERGE_HOME/.claude/settings.json" <<'EOF'
 }
 EOF
 
-OUTPUT=$(HOME="$MERGE_HOME" bash "$SETUP_SCRIPT" claude 2>&1) || true
+OUTPUT=$(HOME="$MERGE_HOME" PATH="$MERGE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" claude 2>&1) || true
 
 MERGED="$MERGE_HOME/.claude/settings.json"
 
@@ -257,13 +254,7 @@ echo ""
 echo -e "${YELLOW}8. Codex setup dry-run (isolated environment)${NC}"
 
 CODEX_HOME="$TEST_DIR/codex_home"
-mkdir -p "$CODEX_HOME/bin"
-
-cat > "$CODEX_HOME/bin/codex" <<'EOF'
-#!/bin/sh
-echo "codex mock"
-EOF
-chmod +x "$CODEX_HOME/bin/codex"
+create_stub_bin "$CODEX_HOME/bin" "codex"
 
 OUTPUT=$(HOME="$CODEX_HOME" PATH="$CODEX_HOME/bin:$PATH" bash "$SETUP_SCRIPT" codex 2>&1) || true
 CODEX_EXIT=$?
@@ -283,14 +274,26 @@ fi
 echo ""
 echo -e "${YELLOW}9. Interactive selector dry-run${NC}"
 
-INTERACTIVE_HOME="$TEST_DIR/interactive_home"
-mkdir -p "$INTERACTIVE_HOME/bin"
+DEFAULT_HOME="$TEST_DIR/default_home"
+mkdir -p "$DEFAULT_HOME/.claude"
+create_stub_bin "$DEFAULT_HOME/bin" "claude"
+create_stub_bin "$DEFAULT_HOME/bin" "uvx"
 
-cat > "$INTERACTIVE_HOME/bin/codex" <<'EOF'
-#!/bin/sh
-echo "codex mock"
-EOF
-chmod +x "$INTERACTIVE_HOME/bin/codex"
+OUTPUT=$(HOME="$DEFAULT_HOME" PATH="$DEFAULT_HOME/bin:$PATH" bash "$SETUP_SCRIPT" < /dev/null 2>&1) || true
+DEFAULT_EXIT=$?
+
+if [ "$DEFAULT_EXIT" -eq 0 ]; then
+    assert_file_exists "Non-interactive default settings.json was created" "$DEFAULT_HOME/.claude/settings.json"
+    assert_json_key "Non-interactive default installed serena" "$DEFAULT_HOME/.claude/settings.json" ".mcpServers.serena"
+else
+    TOTAL=$((TOTAL + 1))
+    echo -e "  ${RED}✗${NC} setup.sh non-interactive default failed (exit code: $DEFAULT_EXIT)"
+    echo -e "    output: $(echo "$OUTPUT" | tail -5)"
+    FAILED=$((FAILED + 1))
+fi
+
+INTERACTIVE_HOME="$TEST_DIR/interactive_home"
+create_stub_bin "$INTERACTIVE_HOME/bin" "codex"
 
 OUTPUT=$(printf "2\n" | HOME="$INTERACTIVE_HOME" PATH="$INTERACTIVE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" 2>&1) || true
 INTERACTIVE_EXIT=$?
@@ -309,39 +312,19 @@ fi
 echo ""
 echo -e "${YELLOW}10. Commands directory${NC}"
 
-COMMANDS_DIR="$SCRIPT_DIR/commands"
+COMMANDS_DIR="$SCRIPT_DIR/claude/commands"
 TOTAL=$((TOTAL + 1))
 if [ -d "$COMMANDS_DIR" ]; then
-    echo -e "  ${GREEN}✓${NC} commands/ directory exists"
+    echo -e "  ${GREEN}✓${NC} claude/commands/ directory exists"
     PASSED=$((PASSED + 1))
 else
-    echo -e "  ${RED}✗${NC} commands/ directory exists"
+    echo -e "  ${RED}✗${NC} claude/commands/ directory exists"
     FAILED=$((FAILED + 1))
 fi
 
 for cmd in maverick.md senior-architect.md senior-backend.md senior-frontend.md senior-security.md senior-qa.md review-resolver.md maverick-single.md; do
     assert_file_exists "command: $cmd" "$COMMANDS_DIR/$cmd"
 done
-
-# ----------------------------------------------------------
-echo ""
-echo -e "${YELLOW}11. Current settings.json sync check${NC}"
-
-REAL_SETTINGS="$HOME/.claude/settings.json"
-if [ -f "$REAL_SETTINGS" ]; then
-    TOTAL=$((TOTAL + 1))
-    if jq -e '.mcpServers.serena' "$REAL_SETTINGS" &>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} serena is in your active settings.json"
-        PASSED=$((PASSED + 1))
-    else
-        echo -e "  ${RED}✗${NC} serena is NOT in your active ~/.claude/settings.json (run setup.sh to fix)"
-        FAILED=$((FAILED + 1))
-    fi
-else
-    TOTAL=$((TOTAL + 1))
-    echo -e "  ${RED}✗${NC} ~/.claude/settings.json does not exist (run setup.sh to create)"
-    FAILED=$((FAILED + 1))
-fi
 
 # ============================================================
 echo ""

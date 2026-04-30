@@ -10,21 +10,24 @@ My personal AI coding configuration with MCPs, skills, commands, and workflows f
 
 ```
 maverick/
-├── mcp-servers/              # MCP server configurations
-│   ├── global.json           # Global MCPs (serena, figma)
-│   └── project.json          # Per-project MCPs
-├── skills/                   # Claude Code custom skills
-│   └── maverick/             # Autonomous development workflow
-│       └── SKILL.md
-├── commands/                 # Claude Code commands (slash commands)
-│   ├── maverick.md           # /maverick - autonomous development
-│   ├── maverick-single.md    # /maverick-single - for worktrees
-│   ├── review-resolver.md    # /review-resolver - PR review handler
-│   ├── senior-architect.md   # /senior-architect - architecture
-│   ├── senior-frontend.md    # /senior-frontend - React/Next.js
-│   ├── senior-backend.md     # /senior-backend - Go/microservices
-│   ├── senior-security.md    # /senior-security - vulnerability scanning
-│   └── senior-qa.md          # /senior-qa - testing and quality
+├── claude/                   # Claude Code configuration assets
+│   ├── mcp-servers/          # Claude MCP server JSON snippets
+│   │   ├── global.json       # Global MCPs (serena, figma)
+│   │   └── project.json      # Per-project MCPs
+│   ├── skills/               # Claude Code custom skills
+│   │   └── maverick/
+│   │       └── SKILL.md
+│   ├── commands/             # Claude Code slash commands
+│   │   ├── maverick.md
+│   │   ├── maverick-single.md
+│   │   ├── review-resolver.md
+│   │   ├── senior-architect.md
+│   │   ├── senior-frontend.md
+│   │   ├── senior-backend.md
+│   │   ├── senior-security.md
+│   │   └── senior-qa.md
+│   └── templates/
+│       └── linear-figma.md
 ├── codex/                    # Codex configuration assets
 │   ├── AGENTS.md             # Project instruction template
 │   ├── config/
@@ -32,8 +35,6 @@ maverick/
 │   └── skills/
 │       └── maverick/
 │           └── SKILL.md
-├── templates/                # Project instruction templates
-│   └── linear-figma.md       # Linear + Figma workflow
 ├── setup.sh                  # Claude Code/Codex installation script
 └── test_setup.sh             # Test suite for setup scripts
 ```
@@ -85,17 +86,17 @@ cp codex/AGENTS.md /path/to/your/project/AGENTS.md
 1. Copy global MCPs:
 ```bash
 # Add to your ~/.claude/settings.json under "mcpServers"
-cat mcp-servers/global.json
+cat claude/mcp-servers/global.json
 ```
 
 2. For specific projects, add to project settings:
 ```bash
-cat mcp-servers/project.json
+cat claude/mcp-servers/project.json
 ```
 
 3. Copy the project instruction template:
 ```bash
-cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
+cp claude/templates/linear-figma.md /path/to/your/project/CLAUDE.md
 ```
 
 ### Manual Codex Setup
@@ -171,11 +172,11 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 
 ### Installing Commands
 
-For Claude Code, copy the `commands/` and `skills/` folders to your project's `.claude/`:
+For Claude Code, copy the `claude/commands/` and `claude/skills/` folders to your project's `.claude/`:
 
 ```bash
-cp -r commands/ /path/to/project/.claude/
-cp -r skills/ /path/to/project/.claude/
+cp -r claude/commands/ /path/to/project/.claude/
+cp -r claude/skills/ /path/to/project/.claude/
 ```
 
 For Codex, install the skill globally and add `AGENTS.md` to each project:
