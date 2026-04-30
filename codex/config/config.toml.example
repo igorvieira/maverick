@@ -1,0 +1,39 @@
+# Example Codex configuration snippets for ~/.codex/config.toml.
+# Copy only the sections you want to use.
+
+# Trust project roots where Maverick is used.
+[projects."/path/to/your/project"]
+trust_level = "trusted"
+
+# Stdio MCP server examples.
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_PERSONAL_ACCESS_TOKEN = "<your-github-token>" }
+
+[mcp_servers."chrome-devtools"]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest"]
+
+[mcp_servers."basic-memory"]
+command = "uvx"
+args = ["basic-memory", "mcp"]
+
+# Remote MCP server examples.
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+
+# Serena can be useful for large codebases.
+[mcp_servers.serena]
+command = "uvx"
+args = [
+  "--from",
+  "git+https://github.com/oraios/serena",
+  "serena",
+  "start-mcp-server",
+  "--context=codex",
+  "--project-from-cwd",
+]

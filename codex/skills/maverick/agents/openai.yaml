@@ -1,0 +1,20 @@
+interface:
+  display_name: "Maverick"
+  short_description: "End-to-end no-regressions development workflow"
+  default_prompt: "Use $maverick to implement this task end to end with planning, verification, and delivery notes."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "linear"
+      description: "Linear issue details and comments"
+      transport: "streamable_http"
+      url: "https://mcp.linear.app/mcp"
+    - type: "mcp"
+      value: "figma"
+      description: "Figma design context and screenshots"
+      transport: "streamable_http"
+      url: "https://mcp.figma.com/mcp"
+
+policy:
+  allow_implicit_invocation: true

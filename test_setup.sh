@@ -79,7 +79,7 @@ assert_json_key() {
 # ============================================================
 echo ""
 echo "=============================="
-echo " Claude Setup Test Suite"
+echo " Maverick Setup Test Suite"
 echo "=============================="
 
 # ----------------------------------------------------------
@@ -131,6 +131,10 @@ echo -e "${YELLOW}2. Required files${NC}"
 assert_file_exists "global.json exists" "$SCRIPT_DIR/mcp-servers/global.json"
 assert_file_exists "project.json exists" "$SCRIPT_DIR/mcp-servers/project.json"
 assert_file_exists "linear-figma template exists" "$SCRIPT_DIR/templates/linear-figma.md"
+assert_file_exists "Codex AGENTS.md template exists" "$SCRIPT_DIR/codex/AGENTS.md"
+assert_file_exists "Codex config example exists" "$SCRIPT_DIR/codex/config/config.toml.example"
+assert_file_exists "Codex Maverick skill exists" "$SCRIPT_DIR/codex/skills/maverick/SKILL.md"
+assert_file_exists "Codex Maverick skill metadata exists" "$SCRIPT_DIR/codex/skills/maverick/agents/openai.yaml"
 
 # ----------------------------------------------------------
 echo ""
@@ -186,8 +190,8 @@ echo -e "${YELLOW}6. Setup dry-run (isolated environment)${NC}"
 FAKE_HOME="$TEST_DIR/home"
 mkdir -p "$FAKE_HOME/.claude"
 
-# Run setup.sh with overridden HOME
-OUTPUT=$(HOME="$FAKE_HOME" bash "$SETUP_SCRIPT" 2>&1) || true
+# Run Claude setup with overridden HOME
+OUTPUT=$(HOME="$FAKE_HOME" bash "$SETUP_SCRIPT" claude 2>&1) || true
 SETUP_EXIT=$?
 
 SETTINGS_RESULT="$FAKE_HOME/.claude/settings.json"
@@ -232,7 +236,7 @@ cat > "$MERGE_HOME/.claude/settings.json" <<'EOF'
 }
 EOF
 
-OUTPUT=$(HOME="$MERGE_HOME" bash "$SETUP_SCRIPT" 2>&1) || true
+OUTPUT=$(HOME="$MERGE_HOME" bash "$SETUP_SCRIPT" claude 2>&1) || true
 
 MERGED="$MERGE_HOME/.claude/settings.json"
 
@@ -250,7 +254,60 @@ fi
 
 # ----------------------------------------------------------
 echo ""
-echo -e "${YELLOW}8. Commands directory${NC}"
+echo -e "${YELLOW}8. Codex setup dry-run (isolated environment)${NC}"
+
+CODEX_HOME="$TEST_DIR/codex_home"
+mkdir -p "$CODEX_HOME/bin"
+
+cat > "$CODEX_HOME/bin/codex" <<'EOF'
+#!/bin/sh
+echo "codex mock"
+EOF
+chmod +x "$CODEX_HOME/bin/codex"
+
+OUTPUT=$(HOME="$CODEX_HOME" PATH="$CODEX_HOME/bin:$PATH" bash "$SETUP_SCRIPT" codex 2>&1) || true
+CODEX_EXIT=$?
+
+if [ "$CODEX_EXIT" -eq 0 ]; then
+    assert_file_exists "Codex config.toml was created" "$CODEX_HOME/.codex/config.toml"
+    assert_file_exists "Maverick Codex skill was installed" "$CODEX_HOME/.codex/skills/maverick/SKILL.md"
+    assert_contains "Codex setup output shows completion" "$OUTPUT" "Setup complete"
+else
+    TOTAL=$((TOTAL + 1))
+    echo -e "  ${RED}✗${NC} setup.sh codex failed in isolated environment (exit code: $CODEX_EXIT)"
+    echo -e "    output: $(echo "$OUTPUT" | tail -5)"
+    FAILED=$((FAILED + 1))
+fi
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}9. Interactive selector dry-run${NC}"
+
+INTERACTIVE_HOME="$TEST_DIR/interactive_home"
+mkdir -p "$INTERACTIVE_HOME/bin"
+
+cat > "$INTERACTIVE_HOME/bin/codex" <<'EOF'
+#!/bin/sh
+echo "codex mock"
+EOF
+chmod +x "$INTERACTIVE_HOME/bin/codex"
+
+OUTPUT=$(printf "2\n" | HOME="$INTERACTIVE_HOME" PATH="$INTERACTIVE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" 2>&1) || true
+INTERACTIVE_EXIT=$?
+
+if [ "$INTERACTIVE_EXIT" -eq 0 ]; then
+    assert_file_exists "Interactive Codex config.toml was created" "$INTERACTIVE_HOME/.codex/config.toml"
+    assert_file_exists "Interactive Maverick Codex skill was installed" "$INTERACTIVE_HOME/.codex/skills/maverick/SKILL.md"
+else
+    TOTAL=$((TOTAL + 1))
+    echo -e "  ${RED}✗${NC} setup.sh interactive selector failed (exit code: $INTERACTIVE_EXIT)"
+    echo -e "    output: $(echo "$OUTPUT" | tail -5)"
+    FAILED=$((FAILED + 1))
+fi
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}10. Commands directory${NC}"
 
 COMMANDS_DIR="$SCRIPT_DIR/commands"
 TOTAL=$((TOTAL + 1))
@@ -268,7 +325,7 @@ done
 
 # ----------------------------------------------------------
 echo ""
-echo -e "${YELLOW}9. Current settings.json sync check${NC}"
+echo -e "${YELLOW}11. Current settings.json sync check${NC}"
 
 REAL_SETTINGS="$HOME/.claude/settings.json"
 if [ -f "$REAL_SETTINGS" ]; then

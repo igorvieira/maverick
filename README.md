@@ -1,5 +1,5 @@
 # Maverick
-My personal Claude Code configuration with MCPs, skills, commands, and workflows.
+My personal AI coding configuration with MCPs, skills, commands, and workflows for Claude Code and Codex.
 
 [![Test Setup](https://github.com/igorvieira/maverick/actions/workflows/test.yml/badge.svg)](https://github.com/igorvieira/maverick/actions/workflows/test.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -13,10 +13,10 @@ maverick/
 ├── mcp-servers/              # MCP server configurations
 │   ├── global.json           # Global MCPs (serena, figma)
 │   └── project.json          # Per-project MCPs
-├── skills/                   # Custom skills
+├── skills/                   # Claude Code custom skills
 │   └── maverick/             # Autonomous development workflow
 │       └── SKILL.md
-├── commands/                 # Commands (slash commands)
+├── commands/                 # Claude Code commands (slash commands)
 │   ├── maverick.md           # /maverick - autonomous development
 │   ├── maverick-single.md    # /maverick-single - for worktrees
 │   ├── review-resolver.md    # /review-resolver - PR review handler
@@ -25,10 +25,17 @@ maverick/
 │   ├── senior-backend.md     # /senior-backend - Go/microservices
 │   ├── senior-security.md    # /senior-security - vulnerability scanning
 │   └── senior-qa.md          # /senior-qa - testing and quality
-├── templates/                # CLAUDE.md templates
+├── codex/                    # Codex configuration assets
+│   ├── AGENTS.md             # Project instruction template
+│   ├── config/
+│   │   └── config.toml.example
+│   └── skills/
+│       └── maverick/
+│           └── SKILL.md
+├── templates/                # Project instruction templates
 │   └── linear-figma.md       # Linear + Figma workflow
-├── setup.sh                  # Installation script
-└── test_setup.sh             # Test suite for setup.sh
+├── setup.sh                  # Claude Code/Codex installation script
+└── test_setup.sh             # Test suite for setup scripts
 ```
 
 ## MCP Servers
@@ -45,12 +52,35 @@ maverick/
 
 ## Installation
 
-### Quick
+### Claude Code
+
 ```bash
-./setup.sh
+./setup.sh claude
 ```
 
-### Manual
+### Codex
+
+```bash
+./setup.sh codex
+```
+
+This installs the Maverick skill into `~/.codex/skills/maverick`, creates `~/.codex/config.toml` if needed, and points you to the MCP snippets in `codex/config/config.toml.example`.
+
+To install both:
+
+```bash
+./setup.sh all
+```
+
+Running `./setup.sh` without arguments opens an interactive selector.
+
+For each project that should use Maverick with Codex:
+
+```bash
+cp codex/AGENTS.md /path/to/your/project/AGENTS.md
+```
+
+### Manual Claude Code Setup
 
 1. Copy global MCPs:
 ```bash
@@ -63,9 +93,27 @@ cat mcp-servers/global.json
 cat mcp-servers/project.json
 ```
 
-3. Copy the CLAUDE.md template to your project:
+3. Copy the project instruction template:
 ```bash
 cp templates/linear-figma.md /path/to/your/project/CLAUDE.md
+```
+
+### Manual Codex Setup
+
+1. Copy the Codex skill:
+```bash
+mkdir -p ~/.codex/skills
+cp -r codex/skills/maverick ~/.codex/skills/
+```
+
+2. Copy or merge the MCP snippets you need:
+```bash
+cat codex/config/config.toml.example
+```
+
+3. Copy the project guide:
+```bash
+cp codex/AGENTS.md /path/to/your/project/AGENTS.md
 ```
 
 ## MCPs Used
@@ -123,11 +171,18 @@ Maverick is a workflow that coordinates senior agents to complete tasks end-to-e
 
 ### Installing Commands
 
-Copy the `commands/` and `skills/` folders to your project's `.claude/`:
+For Claude Code, copy the `commands/` and `skills/` folders to your project's `.claude/`:
 
 ```bash
 cp -r commands/ /path/to/project/.claude/
 cp -r skills/ /path/to/project/.claude/
+```
+
+For Codex, install the skill globally and add `AGENTS.md` to each project:
+
+```bash
+./setup.sh codex
+cp codex/AGENTS.md /path/to/project/AGENTS.md
 ```
 
 ## Critical Rules
@@ -162,7 +217,8 @@ The plugin is available in the official Claude Code marketplace.
 
 ## Requirements
 
-- Claude Code CLI installed
+- Claude Code CLI installed for Claude setup
+- Codex CLI installed for Codex setup
 - Node.js (for stdio MCPs)
 - Python/uvx (for serena and basic-memory)
 
