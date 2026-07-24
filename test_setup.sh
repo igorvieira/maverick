@@ -124,6 +124,10 @@ echo -e "${YELLOW}2. Required files${NC}"
 assert_file_exists "global.json exists" "$SCRIPT_DIR/claude/mcp-servers/global.json"
 assert_file_exists "project.json exists" "$SCRIPT_DIR/claude/mcp-servers/project.json"
 assert_file_exists "linear-figma template exists" "$SCRIPT_DIR/claude/templates/linear-figma.md"
+assert_file_exists "maverick project adapter template exists" "$SCRIPT_DIR/claude/templates/maverick-project.md"
+assert_file_exists "maverick skill exists" "$SCRIPT_DIR/claude/skills/maverick/SKILL.md"
+assert_file_exists "go pack manifest exists" "$SCRIPT_DIR/claude/agents/go/pack.md"
+assert_file_exists "go pack implementer agent exists" "$SCRIPT_DIR/claude/agents/go/go-implementer.md"
 assert_file_exists "Codex AGENTS.md template exists" "$SCRIPT_DIR/codex/AGENTS.md"
 assert_file_exists "Codex config example exists" "$SCRIPT_DIR/codex/config/config.toml.example"
 assert_file_exists "Codex Maverick skill exists" "$SCRIPT_DIR/codex/skills/maverick/SKILL.md"
@@ -322,9 +326,56 @@ else
     FAILED=$((FAILED + 1))
 fi
 
-for cmd in maverick.md senior-architect.md senior-backend.md senior-frontend.md senior-security.md senior-qa.md review-resolver.md maverick-single.md; do
+for cmd in maverick.md senior-architect.md senior-frontend.md senior-security.md senior-qa.md review-resolver.md maverick-single.md; do
     assert_file_exists "command: $cmd" "$COMMANDS_DIR/$cmd"
 done
+
+TOTAL=$((TOTAL + 1))
+if [ ! -f "$COMMANDS_DIR/senior-backend.md" ]; then
+    echo -e "  ${GREEN}✓${NC} senior-backend.md removed (replaced by the go pack)"
+    PASSED=$((PASSED + 1))
+else
+    echo -e "  ${RED}✗${NC} senior-backend.md should not exist (replaced by the go pack)"
+    FAILED=$((FAILED + 1))
+fi
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}11. Project install (isolated environment)${NC}"
+
+PROJECT_TARGET="$TEST_DIR/sample-repo"
+mkdir -p "$PROJECT_TARGET"
+
+OUTPUT=$(bash "$SETUP_SCRIPT" project "$PROJECT_TARGET" --pack go 2>&1) || true
+PROJECT_EXIT=$?
+
+if [ "$PROJECT_EXIT" -eq 0 ]; then
+    assert_file_exists "maverick skill installed in project" "$PROJECT_TARGET/.claude/skills/maverick/SKILL.md"
+    assert_file_exists "maverick command installed in project" "$PROJECT_TARGET/.claude/commands/maverick.md"
+    assert_file_exists "go agent installed flat in project agents/" "$PROJECT_TARGET/.claude/agents/go-implementer.md"
+    assert_file_exists "go pack manifest installed" "$PROJECT_TARGET/.claude/maverick/packs/go.md"
+    assert_file_exists "adapter template installed" "$PROJECT_TARGET/.claude/maverick/project.md"
+
+    TOTAL=$((TOTAL + 1))
+    if [ ! -f "$PROJECT_TARGET/.claude/agents/pack.md" ]; then
+        echo -e "  ${GREEN}✓${NC} pack.md not copied into agents/ (manifest only in maverick/packs/)"
+        PASSED=$((PASSED + 1))
+    else
+        echo -e "  ${RED}✗${NC} pack.md must not be copied into agents/"
+        FAILED=$((FAILED + 1))
+    fi
+
+    # Re-run must preserve an edited adapter
+    echo "customized adapter" > "$PROJECT_TARGET/.claude/maverick/project.md"
+    OUTPUT=$(bash "$SETUP_SCRIPT" project "$PROJECT_TARGET" --pack go 2>&1) || true
+    ADAPTER_CONTENT=$(cat "$PROJECT_TARGET/.claude/maverick/project.md")
+    assert_eq "re-run preserves existing adapter" "customized adapter" "$ADAPTER_CONTENT"
+else
+    TOTAL=$((TOTAL + 1))
+    echo -e "  ${RED}✗${NC} setup.sh project failed (exit code: $PROJECT_EXIT)"
+    echo -e "    output: $(echo "$OUTPUT" | tail -5)"
+    FAILED=$((FAILED + 1))
+fi
 
 # ============================================================
 echo ""

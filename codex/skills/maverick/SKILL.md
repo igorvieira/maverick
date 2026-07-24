@@ -19,7 +19,7 @@ Maverick is a disciplined end-to-end development workflow for Codex. It supports
 
 ### Linear Ticket
 
-Use when the request includes one or more issue IDs, such as `AP-552`.
+Use when the request includes one or more issue IDs, such as `TICKET-123`.
 
 1. Fetch the full ticket with Linear MCP when available.
 2. Extract goal, acceptance criteria, links, affected surfaces, and ambiguity.

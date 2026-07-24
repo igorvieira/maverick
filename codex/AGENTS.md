@@ -36,7 +36,7 @@ This project uses Maverick as an AI-assisted development workflow. Follow this g
 
 ## Linear And Figma
 
-- Linear issue IDs usually look like `AP-552`.
+- Linear issue IDs look like `TICKET-123` (use your team's prefix).
 - If a task includes a Figma URL, extract `fileKey` and `nodeId` and inspect the design before coding.
 - Do not update Linear statuses unless the user asks for it.
 - When finishing a Linear task, prepare a concise implementation note with files changed and test steps.
