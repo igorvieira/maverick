@@ -13,6 +13,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Maverick must stay org-agnostic: no internal company names, service names,
+      # internal libraries, staging hosts, or real ticket IDs may land in this repo.
+      # The deny-list pattern itself is intentionally NOT stored in the repo — configure
+      # the ORG_DATA_DENYLIST repo secret with an extended regex (GitHub masks secret
+      # values in logs). The step is skipped when the secret is unavailable (e.g., fork PRs).
+      - name: Org-data deny-list
+        env:
+          ORG_DATA_DENYLIST: ${{ secrets.ORG_DATA_DENYLIST }}
+        run: |
+          if [ -z "$ORG_DATA_DENYLIST" ]; then
+            echo "ORG_DATA_DENYLIST secret not set - skipping deny-list scan."
+            exit 0
+          fi
+          if grep -rInE "$ORG_DATA_DENYLIST" --exclude-dir=.git .; then
+            echo "::error::Org-specific reference found. Move it to the consuming repo's project adapter (.claude/maverick/project.md)."
+            exit 1
+          fi
+          echo "Deny-list clean."
+
       - name: Install jq
         run: sudo apt-get install -y jq
 

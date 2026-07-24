@@ -17,11 +17,19 @@ CODEX_CONFIG="$CODEX_DIR/config.toml"
 print_usage() {
     cat <<EOF
 Usage: ./setup.sh [claude|codex|all]
+       ./setup.sh project /path/to/repo [--pack go]
 
 Targets:
   claude   Install Claude Code MCP configuration
   codex    Install Codex Maverick skill/templates
   all      Install both Claude Code and Codex assets
+  project  Install the Maverick workflow into a repository's .claude/:
+             - skills/maverick + commands (thin /maverick entry point, maverick-single,
+               review-resolver, senior-*)
+             - each --pack <name>: agents copied flat into .claude/agents/ and the pack
+               manifest into .claude/maverick/packs/<name>.md
+             - the project adapter template into .claude/maverick/project.md
+               (never overwrites an existing adapter)
 
 If no target is provided, setup runs interactively.
 EOF
@@ -189,6 +197,81 @@ install_codex() {
     echo "Codex setup complete."
 }
 
+install_project() {
+    local project_path="$1"
+    shift || true
+
+    echo ""
+    echo "Maverick Project Install"
+    echo "========================"
+
+    if [ -z "$project_path" ] || [ ! -d "$project_path" ]; then
+        echo "Project path not found: '$project_path'" >&2
+        echo "Usage: ./setup.sh project /path/to/repo [--pack go]" >&2
+        exit 1
+    fi
+
+    local packs=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --pack)
+                if [ -z "${2:-}" ]; then
+                    echo "--pack requires a value (e.g., --pack go)" >&2
+                    exit 1
+                fi
+                packs+=("$2")
+                shift 2
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    local target="$project_path/.claude"
+    mkdir -p "$target/commands" "$target/skills/maverick" "$target/agents" "$target/maverick/packs"
+
+    cp "$SCRIPT_DIR"/claude/commands/*.md "$target/commands/"
+    echo "Commands installed: $target/commands/"
+
+    cp "$SCRIPT_DIR/claude/skills/maverick/SKILL.md" "$target/skills/maverick/SKILL.md"
+    echo "Maverick skill installed: $target/skills/maverick/SKILL.md"
+
+    local pack
+    for pack in ${packs[@]+"${packs[@]}"}; do
+        local pack_dir="$SCRIPT_DIR/claude/agents/$pack"
+        if [ ! -d "$pack_dir" ]; then
+            echo "Unknown pack: '$pack'. Available packs:" >&2
+            ls "$SCRIPT_DIR/claude/agents" >&2
+            exit 1
+        fi
+
+        local agent_file
+        for agent_file in "$pack_dir"/*.md; do
+            [ "$(basename "$agent_file")" = "pack.md" ] && continue
+            cp "$agent_file" "$target/agents/"
+        done
+
+        if [ -f "$pack_dir/pack.md" ]; then
+            cp "$pack_dir/pack.md" "$target/maverick/packs/$pack.md"
+        fi
+        echo "Pack '$pack' installed: agents in $target/agents/, manifest in $target/maverick/packs/$pack.md"
+    done
+
+    if [ ! -f "$target/maverick/project.md" ]; then
+        cp "$SCRIPT_DIR/claude/templates/maverick-project.md" "$target/maverick/project.md"
+        echo "Adapter template installed: $target/maverick/project.md"
+        echo ">> Fill it with YOUR project's facts (commands, layout, conventions) — it is the"
+        echo ">> only place project-specific knowledge should live. Never put secrets in it."
+    else
+        echo "Existing adapter preserved: $target/maverick/project.md"
+    fi
+
+    echo ""
+    echo "Project install complete."
+}
+
 TARGET="${1:-}"
 
 if [ -z "$TARGET" ]; then
@@ -205,6 +288,10 @@ case "$TARGET" in
     all)
         install_claude
         install_codex
+        ;;
+    project)
+        shift
+        install_project "$@"
         ;;
     -h|--help|help)
         print_usage

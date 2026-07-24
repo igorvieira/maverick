@@ -5,7 +5,7 @@ arguments:
     description: "PR number or URL (e.g., 123 or https://github.com/org/repo/pull/123)"
     required: true
   - name: repo
-    description: "Repository path relative to project root (e.g., frontend, svc-payments). Auto-detected from PR URL if omitted."
+    description: "Repository path relative to project root (e.g., frontend, payments-service). Auto-detected from PR URL if omitted."
     required: false
 user_invocable: true
 ---
@@ -189,10 +189,11 @@ For each code change, determine the type and use the appropriate agent approach:
 - Follow TypeScript strict mode
 - Maintain existing patterns
 
-**Backend changes** (senior-backend patterns):
-- Follow Go conventions
+**Backend changes** (language pack patterns):
+- Follow the language's conventions and the project adapter (`.claude/maverick/project.md`)
 - Implement proper error handling
 - Add tests if requested
+- If a language pack is installed (e.g., go pack): for non-trivial fixes spawn the pack's implementer agent (`go-implementer`); validate with the applicable pack reviewer (idiom/domain/application/adapter/eventing)
 
 Execute all code changes:
 1. Read the target file **and all files that import/depend on it**
