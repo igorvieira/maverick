@@ -77,8 +77,9 @@ language packs, project adapters, and installers retain their existing workflow.
 do not drive the Rust lifecycle automatically; pack inspection is available separately. This foundation does not make the Maverick workflow
 independent of Claude Code or Codex.
 
-Providers, agent execution, runtime-managed worktrees, scheduler, and policy engine
-are **not implemented**. Approval authorization, required-artifact gates and automatic fix loops are also future integration work. A typed review's
+Agent execution, runtime-managed worktrees, scheduler, policy engine, and LLM
+completions are **not implemented**. Model setup only discovers local CLIs and
+persists a provider list. Approval authorization, required-artifact gates and automatic fix loops are also future integration work. A typed review's
 `is_blocking()` returns true for `fail` status or a `blocker`/`high` finding; the CLI
 validates review JSON but does not yet enforce review results as transition gates.
 No agent semantics or project knowledge have moved into Rust.
@@ -87,16 +88,18 @@ No agent semantics or project knowledge have moved into Rust.
 
 | Crate | Responsibility |
 |---|---|
-| `crates/maverick-core` | Run model, transition validation, artifact/review/pack contracts, capability routing and aggregation; independent of SQLite and CLI |
+| `crates/maverick-core` | Run model, transition validation, artifact/review/pack/model-setup contracts, capability routing and aggregation; independent of SQLite and CLI |
 | `crates/maverick-store` | Local SQLite index, transactional state/history, artifact files and restart recovery |
-| `crates/maverick-cli` | Argument parsing, JSON input/output, pack inspection and useful errors |
+| `crates/maverick-cli` | Clap JSON commands, pack inspection, Ratatui model setup, local CLI discovery |
 | `crates/maverick-packs` | Declarative pack loading, agent-reference checks, file detection and explicit selection |
 
-Dependencies are limited to Serde/JSON (contracts), UUID v4 (run IDs), thiserror
+Dependencies are limited to Serde/JSON/TOML (contracts), UUID v4 (run IDs), thiserror
 (typed library errors), rusqlite with bundled SQLite (no database service or system
 SQLite requirement), tempfile (atomic file publication and test isolation), clap
-(arguments), and anyhow (CLI error context only). `Cargo.lock` is committed.
-The runtime makes no network calls and executes no shell commands.
+(arguments), anyhow (CLI error context), and Ratatui/Crossterm (interactive setup).
+`Cargo.lock` is committed. The runtime makes no network calls and does not invoke
+LLM completions. Discovery may run local `grok models` / `ollama list` when those
+binaries exist; it never stores secrets, only env var names.
 
 ### Build and test
 
@@ -115,6 +118,26 @@ bash test_setup.sh
 Use `target/debug/maverick`, or install the binary with
 `cargo install --path crates/maverick-cli --locked` to use `maverick` on your PATH.
 The existing `setup.sh` does not install the experimental runtime.
+
+### Model setup TUI
+
+`maverick` with no subcommand opens a [Ratatui](https://ratatui.rs/) setup when stdout
+is a TTY. `maverick setup` is the same. Non-TTY sessions print a hint and exit 2;
+use `maverick models` for JSON. The TUI discovers Grok/Claude/Codex/Ollama on PATH,
+lets you set a default, mark a **planner panel** of one or more models, and add an
+OpenAI-compatible or xAI API provider. Grok is a provider implementation, not the
+runtime's internal model. Config is written to `$MAVERICK_CONFIG` or
+`~/.config/maverick/config.toml`; an optional `.maverick/config.toml` overlay lives in
+the consuming project (already gitignored). Secrets stay in the environment.
+
+```bash
+maverick              # TUI on a TTY
+maverick setup
+maverick models       # resolved JSON; no run storage, no completions
+```
+
+Planning-with-every-model in the panel is the next slice. This one only records the
+list.
 
 ### Basic CLI flow
 
