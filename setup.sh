@@ -27,7 +27,7 @@ Targets:
              - skills/maverick + commands (thin /maverick entry point, maverick-single,
                review-resolver, senior-*)
              - each --pack <name>: agents copied flat into .claude/agents/ and the pack
-               manifest into .claude/maverick/packs/<name>.md
+               JSON manifest into .claude/maverick/packs/<name>.json
              - the project adapter template into .claude/maverick/project.md
                (never overwrites an existing adapter)
 
@@ -240,12 +240,22 @@ install_project() {
 
     local pack
     for pack in ${packs[@]+"${packs[@]}"}; do
+        if [[ ! "$pack" =~ ^[a-z][a-z0-9]*([-_][a-z0-9]+)*$ ]]; then
+            echo "Invalid pack ID: '$pack'" >&2
+            exit 1
+        fi
         local pack_dir="$SCRIPT_DIR/claude/agents/$pack"
         if [ ! -d "$pack_dir" ]; then
             echo "Unknown pack: '$pack'. Available packs:" >&2
             ls "$SCRIPT_DIR/claude/agents" >&2
             exit 1
         fi
+
+        if [ ! -f "$pack_dir/pack.json" ]; then
+            echo "Missing structured manifest: $pack_dir/pack.json" >&2
+            exit 1
+        fi
+        cp "$pack_dir/pack.json" "$target/maverick/packs/$pack.json"
 
         local agent_file
         for agent_file in "$pack_dir"/*.md; do
@@ -256,7 +266,7 @@ install_project() {
         if [ -f "$pack_dir/pack.md" ]; then
             cp "$pack_dir/pack.md" "$target/maverick/packs/$pack.md"
         fi
-        echo "Pack '$pack' installed: agents in $target/agents/, manifest in $target/maverick/packs/$pack.md"
+        echo "Pack '$pack' installed: agents in $target/agents/, manifest in $target/maverick/packs/$pack.json"
     done
 
     if [ ! -f "$target/maverick/project.md" ]; then

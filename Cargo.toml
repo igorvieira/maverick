@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/maverick-core", "crates/maverick-store", "crates/maverick-cli"]
+members = ["crates/maverick-core", "crates/maverick-store", "crates/maverick-cli", "crates/maverick-packs"]
 resolver = "2"
 
 [workspace.package]
@@ -18,3 +18,4 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 maverick-core = { path = "crates/maverick-core" }
 maverick-store = { path = "crates/maverick-store" }
+maverick-packs = { path = "crates/maverick-packs" }

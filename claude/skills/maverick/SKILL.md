@@ -2,8 +2,7 @@
 name: maverick
 description: >
   Autonomous end-to-end development workflow. Orchestrates senior agents (architect, frontend, qa)
-  and language-specific agent packs (first pack: the go-* backend suite — planner, implementer,
-  specialist reviewers) to complete tasks from planning to PR and review hand-off. Project facts
+  and declarative language packs (planner, implementer, and specialist reviewers) to complete tasks from planning to PR and review hand-off. Project facts
   come from a per-repo adapter file, so the workflow itself stays project-agnostic. Supports Linear
   tickets, multiple parallel tickets with git worktrees, or local mode (--local) for tasks without
   Linear. Only ONE approval checkpoint (after planning), then fully autonomous with progress reports.
@@ -25,7 +24,7 @@ language expertise comes from **agent packs**.
 | Layer | Where | What it provides |
 |---|---|---|
 | Core workflow | this skill | phases, single approval checkpoint, worktrees, QA gates, delivery, PR + review window |
-| Language packs | `.claude/agents/` + manifest in `.claude/maverick/packs/<pack>.md` | planner / red-team / implementer / specialist reviewers for a language |
+| Language packs | `.claude/agents/` + manifest in `.claude/maverick/packs/<pack>.json` | planner / red-team / implementer / specialist reviewers for a language |
 | Project adapter | `.claude/maverick/project.md` | THIS repo's facts: build/test commands, layout, migrations, conventions, ticket prefix |
 
 **Never hardcode a project fact that belongs in the adapter.** If the adapter is missing, discover
@@ -45,14 +44,21 @@ Before anything else, read `.claude/maverick/project.md`. It defines:
 - **tickets & branches**: ticket prefix, branch source (tracker-suggested vs slug), default branch
 - **PR & review** conventions, and **docs pointers** for deeper context
 
-**If the adapter is missing**, fall back to discovery:
+Read an optional `.claude/maverick/project.json` companion for explicit pack selection
+and command overrides. If it exists, it is authoritative for machine-readable fields;
+`project.md` remains the home for repository context and conventions not in JSON.
+Without the companion, read the existing Markdown adapter normally.
 
-| Signal | Conclusion |
-|---|---|
-| `go.mod` | go pack (if installed in `.claude/agents/`) |
-| `package.json` + `tsconfig.json` / React deps | frontend path (senior-frontend + senior-qa) |
-| `Makefile`, `justfile`, `package.json` scripts | candidate build/test commands |
-| neither | generic roles (see Language Packs below) |
+Selection order is explicit adapter packs, then each installed JSON manifest's detection
+rules, then generic fallback. Detection requires all `files` and, when nonempty, at
+least one `any_files`; empty rules do not auto-select. Multiple matches are allowed.
+Detection is a hint to confirm during planning, not proof of language or available tools.
+An explicitly selected missing/invalid pack is an error, not a silent fallback.
+
+Resolve each command independently: project adapter override → pack default → absent.
+Within the adapter, per-pack overrides take precedence over shared commands. For multiple
+packs, retain separate command sets; do not merge conflicting defaults. Check configured
+scripts/tools before running them. Report absent commands; never invent a fallback.
 
 Record what you resolved and what you assumed. **Assumed facts are surfaced at the approval
 checkpoint (Phase 2.3)** — that's the one chance to correct them.
@@ -103,12 +109,9 @@ When `--local` is used:
 ├────────────────────────────────────────────────────────────────────┤
 │  0. ADAPTER    → Read .claude/maverick/project.md (or discover)    │
 │  1. TASK       → Fetch ticket (Linear) or parse --local input      │
-│  2. PLAN       → FE: senior-architect                              │
-│                  BE: pack planner (+ pack red team)   [APPROVAL]   │
+│  2. PLAN       → Manifest planner (+ optional red team) [APPROVAL] │
 │  3. BRANCH     → Create feature branch (or worktree)               │
-│  4. IMPLEMENT  → FE: senior-frontend approach                      │
-│                  BE: pack implementer → specialist reviewer        │
-│                      panel → fix loop                              │
+│  4. IMPLEMENT  → Manifest implementer → reviewers → fix loop       │
 │  5. QA         → senior-qa validation + regression check           │
 │  6. DELIVER    → Commit, push, summary                             │
 │  7. PR         → Open PR, capture number                           │
@@ -120,44 +123,45 @@ When `--local` is used:
 
 ## Language Packs
 
-Packs are suites of specialist agents installed flat in `.claude/agents/`, described by a
-manifest at `.claude/maverick/packs/<pack>.md` (slot → agent → blocking verdict). Selection order:
+Packs are independent implementations of the same protocol. The authoritative manifest
+is `.claude/maverick/packs/<pack>.json`; prompts remain in `.claude/agents/`. A legacy
+`<pack>.md` is only a compatibility pointer. Do not derive routing from prompt names or
+keep a second table of language-specific rules in this workflow.
 
-1. The adapter's `packs:` declaration
-2. Signal detection (`go.mod` → go pack, if installed)
-3. No pack available → **generic fallback** (below)
+Read and validate schema version 1, unique IDs, required planner/implementer slots,
+optional red-team slot and matching gate, reviewer definitions, commands, and agent files.
+Read the selected agents' prompts for language semantics. Invalid manifests must surface
+clear errors before implementation. When the experimental CLI is available, use:
 
-### Go pack (agents `go-*`)
+```bash
+maverick pack --manifest .claude/maverick/packs/<pack>.json \
+  --agents-dir .claude/agents --classification ./classification.json
+```
 
-| Agent | Role | Verdict scale |
-|---|---|---|
-| `go-task-scope-planner` | Scope analysis, ambiguity detection, implementation plan | structured plan + clarifying questions |
-| `go-adversarial-architect` | Red Team for significant designs | holds / holds with risks / critical flaws |
-| `go-implementer` | Writes the code across all layers | n/a |
-| `go-domain-model-reviewer` | Aggregates, VOs, invariants, state machines | Strong Model / Needs Refinement / Invalid Model |
-| `go-application-flow-reviewer` | Use cases, orchestration, transaction ownership | Clean Flow / Needs Refinement / Broken Flow |
-| `go-adapter-reviewer` | Repositories, gRPC/HTTP handlers, consumers, clients | Clean Adapter / Needs Refinement / Broken Adapter |
-| `go-eventing-reviewer` | Event contracts, publishing, idempotent consumption | Safe Events / Needs Refinement / Dangerous Events |
-| `go-idiom-reviewer` | Idiomatic Go, naming, error handling | Idiomatic / Mostly Idiomatic / Non-Idiomatic |
-| `go-arch-reviewer` | Layer boundaries, transactions, concurrency | Acceptable / Needs Work / Reject (+ Blocker/High/Medium/Low) |
+The CLI returns a deterministic selection and resolved command data; it does not execute
+agents or commands. Without it, the Markdown workflow reads the same JSON protocol:
 
-See `.claude/maverick/packs/go.md` for the full slot mapping, red-team gate, and fix-loop rules.
+1. Classify changes as a set of extensible snake_case capabilities.
+2. Select each reviewer with `always: true` or at least one matching capability.
+3. Preserve manifest order; select each reviewer once. Unknown capabilities are harmless.
+4. Select the red-team slot using the manifest gate's `always`/capabilities rules.
+5. Consume structured ReviewResult status/findings. Transitional prose labels are mapped
+   only by the manifest's `legacy_verdicts`; never guess their meaning from phrases.
+6. Block on fail or blocker/high findings, plus any stricter declared blocking policy.
+   Missing or malformed required results are unresolved reviews, never a pass.
 
-### Frontend path
+For multiple packs, reviewer identity is `(pack.id, reviewer.id)`. Do not conflate equally
+named reviewers from different packs. No pack is a base class for another.
 
-The frontend "pack" is the senior command set: `senior-architect` for planning, `senior-frontend`
-for implementation (Figma-aware), `senior-qa` for visual/functional QA. Framework specifics
-(design system, class/variant utilities, typecheck command) come from the adapter.
+### Generic fallback (no matching pack)
 
-### Generic fallback (no pack for this language)
+- **PLAN**: apply senior-architect thinking and read adapter documentation.
+- **IMPLEMENT**: follow adapter conventions and existing patterns. For a `frontend`
+  capability without a pack, retain the senior-frontend playbook and Figma support.
+- **VERIFY**: run only configured adapter commands.
+- **REVIEW**: self-review and state that no specialist reviewer panel ran.
 
-- **PLAN**: apply senior-architect thinking, adapted to the language; read the adapter's docs pointers
-- **IMPLEMENT**: follow the adapter's conventions and existing code patterns; verify with the
-  adapter's build/test commands
-- **REVIEW**: self-review pass for correctness, error handling, tests, idiom — and **state in the
-  final summary that no specialist reviewer panel ran**
-
-Degrade gracefully; never block on a missing pack.
+Degrade gracefully when no pack matches; explicit invalid selections must be corrected.
 
 ---
 
@@ -312,72 +316,43 @@ Extract and document:
 - **Description**: full requirements
 - **Acceptance Criteria**: what defines "done"
 - **Figma Links**: design references (if any)
-- **Task Type**: FRONTEND or BACKEND
+- **Change Classification**: extensible capability set, with evidence for each signal
 
-### Step 1.2 - Determine Task Type
+### Step 1.2 - Classify Capabilities
 
-| Indicator | Type |
-|-----------|------|
-| UI components, pages, forms, modals | FRONTEND |
-| Figma links present | FRONTEND |
-| Web portals, dashboards | FRONTEND |
-| API endpoints, services, database | BACKEND |
-| Backend language files, migrations, events | BACKEND |
-| Service/worker/cron repositories | BACKEND |
-
-Store result as: `TASK_TYPE = "FRONTEND" | "BACKEND" | "FULLSTACK"`
+Save `classification.json` as a payload such as `{"capabilities": ["frontend", "api_contract"]}`.
+These are examples, not a closed taxonomy. Use the selected pack planner's semantic
+instructions and the actual diff. Capabilities may span multiple concerns and packs;
+there is no FRONTEND/BACKEND/FULLSTACK discriminator. Reclassify if implementation
+reveals additional affected surfaces, then recompute the panel from the manifest.
 
 ---
 
 ## Phase 2: Planning
 
-### Step 2.1 - Plan by Task Type
+### Step 2.1 - Plan with Manifest Slots
 
-**For FRONTEND tasks** — apply senior-architect thinking:
-- Component hierarchy and placement
-- State management approach
-- Data fetching strategy
-- Design system components to use (per adapter)
-- Design token mapping (if Figma)
+Invoke each selected pack's `agents.planner` with the task, adapter, and docs pointers.
+It returns understanding, ambiguities/questions, capability classification, an
+implementation plan, and acceptance criteria. Preserve open questions for approval.
+If no pack matches, use the generic planning fallback. For UI changes, retain design
+system, component, state/data-flow, and Figma analysis where applicable.
 
-**For BACKEND tasks with a pack — Step 2.1a: scope with the pack planner**
-
-Spawn the pack's planner agent (go pack: `go-task-scope-planner`) via the Agent tool with the full
-ticket (title, description, acceptance criteria, linked context) plus **the project adapter and its
-docs pointers**. It returns a structured analysis:
-
-- **Task Understanding** — restated intent, business vs technical separation
-- **Missing Information / Ambiguities + Clarifying Questions** — if not "None", carry these
-  questions into the approval checkpoint (Step 2.3); do NOT guess answers
-- **Change Classification** — Domain / Application Flow / Eventing / Adapters / Pure Implementation
-  (Yes/No each). **Save this: it selects the reviewer panel in Phase 4.**
-- **Proposed Implementation Plan + Acceptance Criteria** — becomes the skeleton of Step 2.2
-- **Recommended Next Agents**
-
-Also map what the planner can't know: service boundaries affected, schema changes, API contract,
-event publishing, migration needs — all per the adapter's conventions.
-
-**For BACKEND tasks with a pack — Step 2.1b: Red Team significant designs**
-
-If the Change Classification marks **Domain or Eventing = Yes**, or the plan introduces new
-aggregates, transaction boundaries, cross-service consistency, or a new eventing strategy, spawn
-the pack's red-team agent (go pack: `go-adversarial-architect`) with the proposed design. Gate on
-its verdict per the pack manifest — never present a critically-flawed plan; revise and re-run first.
-
-Skip the red team for Pure Implementation / Adapters-only changes.
-
-**For BACKEND tasks without a pack** — generic fallback: apply senior-architect thinking to the
-backend (boundaries, contracts, data model, migration needs), reading the adapter's docs pointers.
+Evaluate each manifest's `red_team` gate against the classification. If selected, invoke
+`agents.red_team` with the plan and its language-specific prompt. A blocking result
+requires revision and re-review before approval. For a warning, record mitigations and
+answer outstanding design questions. Do not substitute a language-specific gate here.
 
 ### Step 2.2 - Create Implementation Plan
 
 ```markdown
 ## Implementation Plan: $ARGUMENTS.ticket
 
-### Task Type: [FRONTEND/BACKEND/FULLSTACK]
+### Selected Packs
+- [manifest IDs]
 
-### Change Classification (BACKEND — from the pack planner)
-- Domain: Yes/No | Application Flow: Yes/No | Eventing: Yes/No | Adapters: Yes/No | Pure Implementation: Yes/No
+### Change Classification
+- Capabilities: [extensible identifiers and evidence]
 
 ### Files to Create/Modify
 1. `path/to/file` - Purpose
@@ -396,7 +371,7 @@ backend (boundaries, contracts, data model, migration needs), reading the adapte
 
 ### Risks & Mitigations
 - Risk: ... | Mitigation: ...
-- [BACKEND: P0/P1 attacks from the red team, each with its mitigation]
+- [Red-team findings when selected, each with its mitigation]
 
 ### Adapter Facts Assumed (only if the adapter was missing/incomplete)
 - [facts discovered in Phase 0 that need confirmation]
@@ -442,9 +417,10 @@ git checkout -b <branch-name>
 
 ## Phase 4: Implementation
 
-### FRONTEND Implementation
+### UI Implementation Support (when applicable)
 
-Apply senior-frontend approach:
+Supplement the selected pack implementer with the senior-frontend playbook when UI
+work is involved; without a pack, use that playbook as the implementation fallback:
 
 **Step 4.1 - Figma Analysis** (if link exists)
 
@@ -468,74 +444,53 @@ Rules:
 - ALWAYS use the project's design system components (adapter names them)
 - Use the project's class-merge / variant utilities per the adapter
 - Follow existing patterns in the codebase
-- Strict typing (no `any` in TypeScript projects)
+- Follow type-safety and framework rules from the selected pack and project adapter
 
 **Step 4.3 - Verify**
-```bash
-# adapter typecheck command (default for TS projects):
-npx tsc --noEmit
-```
+Run the resolved typecheck command when configured. If absent, report that limitation;
+do not invent a language-specific command.
 
 ---
 
-### BACKEND Implementation (with a pack)
+### Implementation with a Pack
 
-**Step 4.1 - Implement with the pack implementer**
+**Step 4.1 - Implement with the manifest slot**
 
-Spawn the pack's implementer (go pack: `go-implementer`) via the Agent tool with: the approved
-plan, the Change Classification, answered Open Questions, **the project adapter**, and the
-adapter's docs pointers. It writes production-ready code across all layers, including tests.
-
-The implementer must follow the adapter for:
-- Repository layout (where commands/queries/handlers live)
-- Migrations & codegen workflow (never bypass the project's tooling)
-- Error handling / logging conventions
-- Testing strategy (unit vs integration, required tooling)
+Invoke `agents.implementer` with the approved plan, capabilities, answered questions,
+adapter, and documentation. Layout, migrations/codegen, error handling, testing, and
+language conventions come from those inputs and the prompt.
 
 **Step 4.2 - Verify Build**
-```bash
-# adapter build/test commands (go pack defaults):
-go build ./...
-go test ./...
-```
-Fix failures before review — never send broken code to the reviewer panel.
+
+Run the resolved build/test commands when present. Missing commands must be reported;
+failing configured checks must be fixed before review.
 
 **Step 4.3 - Specialist Review Panel**
 
-Select reviewers from the planner's **Change Classification** (plus diff inspection as a fallback)
-and spawn them **in parallel** (single message, multiple Agent calls), each with the diff and brief
-context. Go pack panel:
-
-| Classification / diff touches | Reviewer | Blocking verdict |
-|---|---|---|
-| Domain = Yes (aggregates, VOs, invariants, state machines) | `go-domain-model-reviewer` | Invalid Model |
-| Application Flow = Yes (use cases, handlers, orchestration) | `go-application-flow-reviewer` | Broken Flow |
-| Adapters = Yes (repos, gRPC/HTTP handlers, consumers, clients) | `go-adapter-reviewer` | Broken Adapter |
-| Eventing = Yes (event structs, publish/consume) | `go-eventing-reviewer` | Dangerous Events |
-| Always | `go-idiom-reviewer` | Non-Idiomatic |
-| New boundaries, transactions, concurrency (significant changes) | `go-arch-reviewer` | Reject, or any **Blocker** finding |
+Route from the final capability set using the Language Packs protocol above. The
+existing Markdown workflow may dispatch its selected panel in parallel, preserving
+manifest order in reports; this does not add execution to the Rust runtime. Give each
+reviewer the diff, adapter, and its own prompt. The runtime has no language-specific
+reviewer names or semantic knowledge.
 
 **Step 4.4 - Fix Loop**
 
-Gate rules:
-- Any **blocking verdict** (right column) or arch **Blocker/High** finding → MUST fix
-- Middle verdicts ("Needs Refinement" / "Mostly Idiomatic" / "Needs Work") → apply the listed
-  MUST-FIX items; remaining suggestions are judgment calls — apply or record as Accepted Trade-offs
-- Top verdicts → done
+Apply each reviewer's declared blocking policy to its structured result. Fix blockers;
+when `review_policy.resolve_warnings` is true, resolve required warning findings and
+record remaining suggestions as accepted trade-offs. MUST-FIX findings must carry high
+or blocker severity, even when the overall status is warn.
 
-Apply fixes (spawn the implementer again for non-trivial ones), re-run build/test, then re-run
-**only the reviewers that blocked**. Repeat until no blocking verdicts. After 3 rounds without
-convergence, stop and surface the disagreement to the user instead of looping.
+Apply fixes through the selected implementer, re-run configured verification, and
+re-run only blocked reviewers when `rerun_blocked_only` is true; otherwise re-run the
+selected panel. Stop and surface disagreement at `max_fix_rounds` from the manifest.
+Carry final results, warning resolutions, and trade-offs into QA. These are workflow
+policies; the Rust slice selects and aggregates but does not execute this loop.
 
-Carry every reviewer's final verdict + Accepted Trade-offs into the QA report.
+### Implementation without a Pack
 
-### BACKEND Implementation (no pack — generic fallback)
-
-- Implement following the adapter's conventions and the closest existing patterns in the codebase
-- Write tests per the adapter's testing strategy
-- Verify with the adapter's build/test commands
-- Self-review for correctness, error handling, tests, idiom; note in the summary that no
-  specialist panel ran
+- Follow adapter conventions and existing patterns.
+- Add relevant tests and run configured commands.
+- Self-review and state that no specialist panel ran.
 
 ---
 
@@ -543,7 +498,7 @@ Carry every reviewer's final verdict + Accepted Trade-offs into the QA report.
 
 Apply senior-qa approach for validation:
 
-### FRONTEND QA Checklist
+### UI QA Checklist (when applicable)
 
 - [ ] **Figma Compliance** (if applicable)
   - Compare implementation with screenshot
@@ -563,7 +518,7 @@ Apply senior-qa approach for validation:
   - Loading states present
   - Error states handled
 
-### BACKEND QA Checklist
+### General QA Checklist
 
 - [ ] **Code Quality**
   - Error handling per adapter conventions
@@ -586,7 +541,7 @@ Apply senior-qa approach for validation:
   - Event handlers working
 
 - [ ] **Specialist Reviews** (when a pack ran)
-  - Reviewer panel (Step 4.3) ran for every classification marked Yes + the always-on reviewer
+  - Reviewer panel (Step 4.3) includes every manifest match and every mandatory reviewer
   - Zero blocking verdicts remain; fix loop (Step 4.4) converged
   - Final verdicts and Accepted Trade-offs recorded in the QA report
 
@@ -789,7 +744,7 @@ Use TaskList to track progress:
 |------------|--------|
 | Adapter read (or discovery done) | ⬜ |
 | Task fetched | ⬜ |
-| Task type determined | ⬜ |
+| Capabilities classified | ⬜ |
 | Plan created | ⬜ |
 | Plan approved | ⬜ |
 | Branch created | ⬜ |
@@ -829,7 +784,7 @@ Use TaskList to track progress:
 1. **ONE approval only** - after planning, then fully autonomous
 2. **No interruptions** - never ask questions after approval
 3. **Progress reports** - follow the time-based schedule
-4. **Use the right agents** - pack agents for backend, senior agents for frontend/QA
+4. **Use the right agents** - manifest slots for packs, senior playbooks for fallback/UI support/QA
 5. **QA must pass** before delivery
 6. **No Co-Authored-By** in commits
 7. **Summary in English** with bullet points

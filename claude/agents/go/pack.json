@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "id": "go",
+  "display_name": "Go",
+  "detection": {
+    "files": [
+      "go.mod"
+    ],
+    "any_files": []
+  },
+  "commands": {
+    "format": "gofmt -w .",
+    "build": "go build ./...",
+    "test": "go test ./..."
+  },
+  "agents": {
+    "planner": "go-task-scope-planner",
+    "implementer": "go-implementer",
+    "red_team": "go-adversarial-architect"
+  },
+  "reviewers": [
+    {
+      "id": "idiom",
+      "agent": "go-idiom-reviewer",
+      "always": true,
+      "capabilities": [],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Idiomatic": "pass",
+        "Mostly Idiomatic": "warn",
+        "Non-Idiomatic": "fail"
+      }
+    },
+    {
+      "id": "domain",
+      "agent": "go-domain-model-reviewer",
+      "always": false,
+      "capabilities": [
+        "domain"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Strong Model": "pass",
+        "Needs Refinement": "warn",
+        "Invalid Model": "fail"
+      }
+    },
+    {
+      "id": "application_flow",
+      "agent": "go-application-flow-reviewer",
+      "always": false,
+      "capabilities": [
+        "application_flow"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Clean Flow": "pass",
+        "Needs Refinement": "warn",
+        "Broken Flow": "fail"
+      }
+    },
+    {
+      "id": "adapter",
+      "agent": "go-adapter-reviewer",
+      "always": false,
+      "capabilities": [
+        "adapters",
+        "api_contract",
+        "database"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Clean Adapter": "pass",
+        "Needs Refinement": "warn",
+        "Broken Adapter": "fail"
+      }
+    },
+    {
+      "id": "eventing",
+      "agent": "go-eventing-reviewer",
+      "always": false,
+      "capabilities": [
+        "eventing"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Safe Events": "pass",
+        "Needs Refinement": "warn",
+        "Dangerous Events": "fail"
+      }
+    },
+    {
+      "id": "architecture",
+      "agent": "go-arch-reviewer",
+      "always": false,
+      "capabilities": [
+        "architecture",
+        "transaction_boundaries",
+        "cross_service_consistency",
+        "concurrency"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      },
+      "legacy_verdicts": {
+        "Acceptable": "pass",
+        "Needs Work": "warn",
+        "Reject": "fail"
+      }
+    }
+  ],
+  "red_team": {
+    "always": false,
+    "capabilities": [
+      "domain",
+      "eventing",
+      "aggregate_design",
+      "transaction_boundaries",
+      "cross_service_consistency",
+      "eventing_strategy"
+    ],
+    "blocking": {
+      "statuses": [
+        "fail"
+      ],
+      "severities": [
+        "blocker",
+        "high"
+      ]
+    },
+    "legacy_verdicts": {
+      "Architecture holds under scrutiny": "pass",
+      "Architecture holds with identified risks": "warn",
+      "Architecture has critical flaws": "fail"
+    }
+  },
+  "review_policy": {
+    "max_fix_rounds": 3,
+    "rerun_blocked_only": true,
+    "resolve_warnings": true
+  }
+}

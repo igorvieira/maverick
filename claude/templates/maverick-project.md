@@ -16,10 +16,41 @@ Rules for this file:
 ## Stack & Packs
 
 <!-- Agent packs installed in .claude/agents/ that Maverick should use -->
-packs: none            <!-- e.g., go -->
+packs: none            <!-- ordered list, e.g., go, typescript -->
 frontend: none         <!-- e.g., react-nextjs | vue | none -->
 
+## Structured Companion (optional)
+
+You may create `.claude/maverick/project.json` using schema version 1. When present,
+it owns selected packs and command overrides; do not duplicate those fields here.
+It may also hold conventions and layout; keep each fact in one place. This Markdown
+file remains the context source for facts not in the companion. Existing Markdown-only
+adapters continue to work with the workflow. The Rust CLI reads the explicit JSON file.
+
+```json
+{
+  "schema_version": 1,
+  "packs": [],
+  "commands": {},
+  "pack_commands": {},
+  "project_commands": {},
+  "conventions": [],
+  "layout": {}
+}
+```
+
+`packs` is an ordered array of manifest IDs. An explicit empty array disables automatic
+selection. Use `pack_commands` for overrides scoped by pack ID, `commands` for shared
+overrides, and `project_commands` for named project-only commands (for example migrations).
+
 ## Commands
+
+Precedence, per command: project adapter override → language pack default → absent.
+Within the adapter, per-pack overrides win over shared commands. Resolve each pack
+separately. Omitted/null fields inherit; blank commands are invalid. Missing commands
+stay absent: report the gap, never invent or execute a substitute. Commands are trusted
+project configuration and must be checked before execution; the Rust CLI only reports them.
+
 
 build: <e.g., go build ./... | pnpm build>
 test: <e.g., go test ./... | pnpm test>

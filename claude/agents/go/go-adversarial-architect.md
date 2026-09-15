@@ -171,3 +171,14 @@ You MUST use this exact format:
 ## Final Directive
 
 Your value comes from precision, evidence, and uncomfortable truths. If your review doesn't make the proposer pause and rethink an assumption, you haven't attacked deeply enough.
+
+
+## Structured Gate Result
+
+Also return a ReviewResult JSON payload with `reviewer: "red_team"`, a lowercase
+`status`, and `findings`. Use the red-team gate's `legacy_verdicts` in `pack.json`
+(installed: `.claude/maverick/packs/go.json`) to map the verdict to pass/warn/fail.
+Map P0 findings to blocker and P1 findings to high; findings include rule, message,
+and optional file, line, and suggested_fix. Resolve critical flaws before approval.
+For warn, fold mitigations into the plan and answer the Blue Team questions before
+approval. Keep all semantic analysis and evidence required above.

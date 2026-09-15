@@ -284,6 +284,7 @@ dependencies = [
  "anyhow",
  "clap",
  "maverick-core",
+ "maverick-packs",
  "maverick-store",
  "serde_json",
  "tempfile",
@@ -297,6 +298,16 @@ dependencies = [
  "serde_json",
  "thiserror",
  "uuid",
+]
+
+[[package]]
+name = "maverick-packs"
+version = "0.1.0"
+dependencies = [
+ "maverick-core",
+ "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

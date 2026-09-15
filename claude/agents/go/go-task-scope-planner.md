@@ -67,15 +67,25 @@ When given a task, reason through these lenses:
 
 ## Change Classification (Mandatory)
 
-You MUST classify the task into one or more categories:
+Return a `classification.json` payload with a `capabilities` array of extensible
+snake_case identifiers. For this pack, classify the task using these semantic signals:
 
-- **Domain change**: aggregates, entities, invariants, value objects
-- **Application flow change**: new use case, orchestration, policy
-- **Eventing change**: new/changed events or consumers
-- **Adapter change**: handlers, repositories, consumers, clients
-- **Pure implementation**: mechanical code with no design impact
+- `domain`: aggregates, entities, invariants, value objects
+- `application_flow`: new use case, orchestration, policy
+- `eventing`: new/changed events or consumers
+- `adapters`: handlers, repositories, consumers, clients
+- `pure_implementation`: mechanical code with no design impact
 
-State this explicitly in the output.
+Also include `architecture` for significant boundary/reliability design changes,
+`transaction_boundaries` for new transaction scopes, `cross_service_consistency` for
+cross-service consistency changes, and `concurrency` for concurrency concerns.
+Use `aggregate_design` for new aggregates and `eventing_strategy` for a new eventing
+strategy. These signals preserve the pack's red-team and architecture gates. Include
+`api_contract` or `database` when those adapter surfaces change. New capabilities
+are allowed; the runtime does not enumerate them.
+
+State this explicitly in the output. Read pack.json (installed:
+`.claude/maverick/packs/go.json`) for reviewer selection and gate policy.
 
 ## Clarifying Questions (High Signal Only)
 
@@ -118,16 +128,9 @@ If the task lacks acceptance criteria, propose them.
 
 ## Agent Recommendations (Mandatory)
 
-At the end, explicitly state which agents should be used during implementation:
-
-- `go-idiom-reviewer` — for any new Go code
-- `go-domain-model-reviewer` — for domain model changes
-- `go-application-flow-reviewer` — for use case/orchestration changes
-- `go-eventing-reviewer` — for event changes
-- `go-adapter-reviewer` — for infrastructure adapter changes
-- `go-arch-reviewer` — for system-level reliability/consistency concerns
-
-Only recommend agents that are actually needed based on the change classification.
+At the end, derive recommended reviewers and the red-team gate from the pack JSON
+using the classification capabilities. Do not maintain a separate routing table here.
+Always include mandatory reviewers and preserve manifest order.
 
 ## Output Format
 
@@ -146,11 +149,9 @@ Your response MUST follow this structure:
 (or "None — task is sufficiently clear")
 
 ## Change Classification
-- Domain: Yes/No (brief explanation if Yes)
-- Application Flow: Yes/No (brief explanation if Yes)
-- Eventing: Yes/No (brief explanation if Yes)
-- Adapters: Yes/No (brief explanation if Yes)
-- Pure Implementation: Yes/No (brief explanation if Yes)
+- Capabilities: [snake_case identifiers with evidence]
+- Provide the same identifiers as the `classification.json` payload:
+  `{"capabilities": ["domain", "eventing"]}` (example only; classify the actual task)
 
 ## Proposed Implementation Plan
 1. ...

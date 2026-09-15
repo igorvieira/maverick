@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "typescript",
+  "display_name": "TypeScript",
+  "detection": {
+    "files": [],
+    "any_files": [
+      "tsconfig.json",
+      "package.json"
+    ]
+  },
+  "commands": {
+    "build": "npm run build",
+    "test": "npm test",
+    "lint": "npm run lint",
+    "typecheck": "npm run typecheck"
+  },
+  "agents": {
+    "planner": "typescript-task-scope-planner",
+    "implementer": "typescript-implementer"
+  },
+  "reviewers": [
+    {
+      "id": "type_safety",
+      "agent": "typescript-type-safety-reviewer",
+      "always": true,
+      "capabilities": [],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "frontend",
+      "agent": "typescript-frontend-reviewer",
+      "always": false,
+      "capabilities": [
+        "frontend",
+        "accessibility"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "contracts",
+      "agent": "typescript-contract-reviewer",
+      "always": false,
+      "capabilities": [
+        "api_contract",
+        "runtime_validation"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    }
+  ],
+  "review_policy": {
+    "max_fix_rounds": 3,
+    "rerun_blocked_only": true,
+    "resolve_warnings": true
+  }
+}
