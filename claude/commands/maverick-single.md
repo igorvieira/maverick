@@ -14,12 +14,12 @@ Execute development cycle for **$ARGUMENTS.ticket** in current worktree.
 > This command is used by `/maverick` when running parallel worktrees.
 > It assumes you're already in the correct worktree directory.
 > Project facts come from the adapter (`.claude/maverick/project.md`); language expertise comes
-> from the installed pack (manifest: `.claude/maverick/packs/<pack>.md`).
+> from the installed pack (manifest: `.claude/maverick/packs/<pack>.json`).
 
 ## Workflow
 
 ```
-ADAPTER → TASK → PLAN (FE: senior-architect | BE: pack planner) → IMPLEMENT (BE: pack implementer → reviewer panel) → QA → COMMIT → PUSH → OPEN PR → REVIEW WAIT
+ADAPTER → TASK → PLAN (manifest planner) → IMPLEMENT (manifest implementer → routed reviewers) → QA → COMMIT → PUSH → OPEN PR → REVIEW WAIT
 ```
 
 ### Phase 0: Read the Adapter
@@ -36,51 +36,47 @@ mcp__linear__get_issue with id: "$ARGUMENTS.ticket"
 Extract:
 - Title, description, acceptance criteria
 - Figma links (if any)
-- Task type: FRONTEND or BACKEND
+- Extensible capability classification, saved as `classification.json`
 
 ### Phase 2: Planning
 
-**FRONTEND** (senior-architect): plan files to create/modify, components needed, implementation steps.
+Use the selected manifests' planner slots and the core skill's Language Packs protocol.
+Read `.claude/maverick/project.json` when present for explicit packs and command
+overrides; otherwise retain the Markdown adapter. Selected packs override detection.
+JSON manifests are authoritative; legacy Markdown manifest files are pointers only.
 
-**BACKEND** (pack planner — go pack: `go-task-scope-planner`): spawn with the ticket + adapter →
-plan + **Change Classification** (drives the Phase 3 reviewer panel) + Clarifying Questions. If
-Domain or Eventing = Yes, red-team with the pack's adversarial agent (`go-adversarial-architect`)
-and fold P0/P1 attacks into Risks. No pack installed → generic senior-architect planning.
+Classify capabilities with evidence. Invoke a red-team slot only when its manifest gate
+matches. Resolve blockers before approval and fold warning mitigations into the plan.
+No matching pack → generic senior-architect planning. Invalid explicit packs → error.
 
 **Present plan (with any Open Questions) and wait for approval.**
 
 ### Phase 3: Implement
 
-Current worktree already has the feature branch. Proceed with implementation.
+Current worktree already has the feature branch. Use manifest implementer slots with
+the approved plan, capabilities, and adapter. Retain senior-frontend/Figma support for
+UI work; without a matching pack, follow the existing generic implementation fallback.
 
-**FRONTEND** (senior-frontend):
-```
-mcp__figma__get_design_context (if Figma link)
-mcp__figma__get_variable_defs (if Figma link)
-```
-- Use the project's design system components (per adapter)
-- Verify with the adapter's typecheck command (default: `npx tsc --noEmit`)
+Resolve commands per pack: adapter override → pack default → absent. Run only configured
+commands after checking their scripts/tools. Never invent a default when one is missing.
 
-**BACKEND** (pack agents — go pack shown):
-- Implement via `go-implementer` (approved plan + Change Classification + adapter): layout,
-  migrations/codegen, error handling, and tests all per the adapter's conventions
-- Verify with the adapter's build/test commands (go defaults: `go build ./... && go test ./...`) — fix before review
-- Reviewer panel in parallel, selected by Change Classification: `go-idiom-reviewer` always;
-  domain/application/adapter/eventing/arch reviewers where Yes
-- Fix loop: blocking verdicts (Invalid Model, Broken Flow, Broken Adapter, Dangerous Events,
-  Non-Idiomatic, Reject/Blocker) MUST be fixed; re-run only blocked reviewers; max 3 rounds then surface
-- No pack installed → implement following the adapter + existing patterns; self-review; note in
-  the summary that no specialist panel ran
+Select reviewers in manifest order: `always` or any capability intersection, once each.
+Unknown capabilities select no additional reviewers. Keep reviewer IDs scoped by pack.
+The existing Markdown panel may run in parallel; Rust does not dispatch execution.
+Consume structured results, mapping legacy labels only through manifest `legacy_verdicts`.
+Fail or blocker/high findings always block. Missing required results remain unresolved.
+Apply `review_policy`: resolve warnings, rerun blocked reviewers when configured, and
+stop at the declared maximum fix rounds. Record accepted trade-offs and final results.
 
 ### Phase 4: QA Review (senior-qa)
 
-**FRONTEND:**
+**UI work, when applicable:**
 - [ ] Figma compliance (tokens, spacing, typography)
 - [ ] Design system components used
 - [ ] Typecheck passes
 - [ ] All criteria met
 
-**BACKEND:**
+**General checks:**
 - [ ] Tests pass
 - [ ] Migrations work (if any)
 - [ ] Error handling correct

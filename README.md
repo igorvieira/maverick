@@ -32,8 +32,10 @@ maverick/
 │   │   └── maverick/
 │   │       └── SKILL.md          # Core workflow (single source of truth)
 │   ├── agents/
+│   │   ├── typescript/           # Minimal TypeScript pack
 │   │   └── go/                   # Go language pack (DDD + Clean Architecture)
-│   │       ├── pack.md           # Manifest: slot → agent → blocking verdict
+│   │       ├── pack.json         # Authoritative structured manifest
+│   │       ├── pack.md           # Compatibility pointer only
 │   │       ├── go-task-scope-planner.md
 │   │       ├── go-adversarial-architect.md
 │   │       ├── go-implementer.md
@@ -71,13 +73,12 @@ structured review results. The CLI records lifecycle steps explicitly; it does n
 perform the work described by those steps.
 
 **Markdown skills remain the current workflow interface.** The existing commands,
-language packs, project adapters, and installers continue to work as before. They do
-not call this kernel yet. This foundation does not make the Maverick workflow
+language packs, project adapters, and installers retain their existing workflow. They
+do not drive the Rust lifecycle automatically; pack inspection is available separately. This foundation does not make the Maverick workflow
 independent of Claude Code or Codex.
 
 Providers, agent execution, runtime-managed worktrees, scheduler, and policy engine
-are **not implemented**. Approval authorization, required-artifact gates, reviewer
-selection, and automatic fix loops are also future integration work. A typed review's
+are **not implemented**. Approval authorization, required-artifact gates and automatic fix loops are also future integration work. A typed review's
 `is_blocking()` returns true for `fail` status or a `blocker`/`high` finding; the CLI
 validates review JSON but does not yet enforce review results as transition gates.
 No agent semantics or project knowledge have moved into Rust.
@@ -86,9 +87,10 @@ No agent semantics or project knowledge have moved into Rust.
 
 | Crate | Responsibility |
 |---|---|
-| `crates/maverick-core` | Run model, transition validation, artifact envelope, review contracts; independent of SQLite and CLI |
+| `crates/maverick-core` | Run model, transition validation, artifact/review/pack contracts, capability routing and aggregation; independent of SQLite and CLI |
 | `crates/maverick-store` | Local SQLite index, transactional state/history, artifact files and restart recovery |
-| `crates/maverick-cli` | Argument parsing, JSON input/output, useful errors and nonzero exit codes |
+| `crates/maverick-cli` | Argument parsing, JSON input/output, pack inspection and useful errors |
+| `crates/maverick-packs` | Declarative pack loading, agent-reference checks, file detection and explicit selection |
 
 Dependencies are limited to Serde/JSON (contracts), UUID v4 (run IDs), thiserror
 (typed library errors), rusqlite with bundled SQLite (no database service or system
@@ -240,7 +242,7 @@ This experimental schema has no migration path to future versions yet.
 
 This installs into the repo's `.claude/`:
 - the maverick skill + commands
-- the go pack agents (flat in `.claude/agents/`) and its manifest (`.claude/maverick/packs/go.md`)
+- the go pack agents (flat in `.claude/agents/`) and its manifest (`.claude/maverick/packs/go.json`; `go.md` is a compatibility pointer)
 - the **project adapter template** at `.claude/maverick/project.md` (never overwrites an existing one)
 
 Then **fill the adapter** with your repo's facts — commands, layout, migration workflow,
@@ -285,9 +287,9 @@ local tasks.
 ```
 0. ADAPTER    → Read .claude/maverick/project.md (or discover)
 1. TASK       → Fetch ticket (Linear) or parse --local input
-2. PLAN       → FE: senior-architect | BE: pack planner (+ red team)   [ONLY APPROVAL]
+2. PLAN       → Manifest planner (+ optional red team)   [ONLY APPROVAL]
 3. BRANCH     → Feature branch (or worktree)
-4. IMPLEMENT  → FE: senior-frontend | BE: pack implementer → reviewer panel → fix loop
+4. IMPLEMENT  → Manifest implementer → capability-routed reviewers → fix loop
 5. QA         → senior-qa validation + mandatory regression check
 6. DELIVER    → Commit, push, summary
 7. PR         → Open PR, capture number
@@ -298,32 +300,51 @@ local tasks.
 
 ## Language Packs
 
-A pack is a suite of specialist agents for one language, with a manifest mapping workflow slots
-(planner / red team / implementer / reviewers) to agents and their **blocking verdicts**. The core
-skill selects the pack from the adapter (or repo signals like `go.mod`) and degrades gracefully to
-generic roles when no pack is installed.
+Language packs implement a language-independent contract: detection, optional commands,
+planner/implementer slots, optional red-team gates, and ordered capability-based reviewers.
+**Go is the first implementation, not the runtime's internal model.** Its semantic
+DDD, Clean Architecture, eventing, and idiom guidance stays in its prompts. TypeScript
+proves the same protocol works with a different reviewer set and command set.
 
-### Go pack
+The authoritative manifests are [Go](claude/agents/go/pack.json) and
+[TypeScript](claude/agents/typescript/pack.json). Markdown manifest files are compatibility
+pointers, not editable policy copies. Both workflow entry points read JSON. The Rust
+loader and router have no language-specific branches or hardcoded agent names.
 
-Backend suite for Go services following DDD + Clean Architecture:
+| Pack | Review coverage |
+|---|---|
+| Go | Mandatory idiom; conditional domain, application flow, adapters, eventing and architecture |
+| TypeScript | Mandatory type safety; conditional frontend/accessibility and API contracts/runtime validation |
 
-| Agent | Role | Blocking verdict |
-|---|---|---|
-| `go-task-scope-planner` | Scope analysis, ambiguity detection, Change Classification | — |
-| `go-adversarial-architect` | Red Team for significant designs | critical flaws |
-| `go-implementer` | Writes code across all layers | — |
-| `go-domain-model-reviewer` | Aggregates, VOs, invariants, state machines | Invalid Model |
-| `go-application-flow-reviewer` | Use cases, orchestration, transactions | Broken Flow |
-| `go-adapter-reviewer` | Repos, HTTP/gRPC handlers, consumers, clients | Broken Adapter |
-| `go-eventing-reviewer` | Event contracts, publishing, idempotent consumption | Dangerous Events |
-| `go-idiom-reviewer` | Idiomatic Go, naming, error handling | Non-Idiomatic |
-| `go-arch-reviewer` | Layer boundaries, transactions, concurrency | Reject / Blocker |
+Capabilities are extensible validated snake_case strings, not a closed enum. Reviewers
+are selected once in manifest order by `always` or any capability intersection. Unknown
+capabilities do not break routing. Structured fail or blocker/high findings block review;
+Go's legacy prose verdict mappings live only in its JSON manifest.
 
-The reviewer panel is selected by the planner's Change Classification and runs **in parallel**;
-blocking verdicts feed a fix loop (max 3 rounds, then surface to the user).
+```bash
+./setup.sh project /path/to/your/repo --pack go --pack typescript
 
-Future packs (e.g., `typescript/`, `python/`) plug into the same slots without touching the core
-skill.
+cargo run -p maverick-cli -- pack --manifest claude/agents/go/pack.json \
+  --capability domain --capability eventing
+# idiom, domain, eventing; red team required
+
+cargo run -p maverick-cli -- pack --manifest claude/agents/typescript/pack.json \
+  --capability frontend --capability api_contract
+# type_safety, frontend, contracts; no red team
+```
+
+The same code path handles both packs. Pack inspection returns JSON and never runs
+agents, shell commands, or lifecycle transitions. The existing Markdown workflow still
+performs execution and applies each manifest's fix policy.
+
+Project adapters can select multiple packs and override commands. Per command:
+**project adapter override → pack default → absent**. Per-pack adapter overrides take
+precedence over shared adapter commands. Resolve defaults separately per pack; never
+invent missing commands. An optional consuming-project `project.json` companion supports
+the Rust CLI; Markdown-only adapters continue working with the workflow.
+
+See [the pack specification](docs/language-packs.md) for the schema, agent checks,
+selection/detection rules, aggregation, adapter format, compatibility, and limitations.
 
 ### Senior Commands
 

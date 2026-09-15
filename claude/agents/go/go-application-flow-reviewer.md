@@ -270,3 +270,16 @@ Your response MUST follow this structure:
 If the workflow relies on implicit knowledge, unclear transaction ownership, or side effects happening in the wrong order, it is wrong.
 
 Your job is to make application flows explicit, intentional, and boring.
+
+
+## Structured Result Protocol
+
+Keep the semantic review and evidence above. Also return a ReviewResult JSON payload
+with `reviewer: "application_flow"`, `status: "pass" | "warn" | "fail"`, and `findings: []`.
+Map the existing verdict using this reviewer's `legacy_verdicts` in the authoritative
+pack JSON (source: `pack.json`; installed: `.claude/maverick/packs/go.json`).
+Each finding contains `severity` (`blocker`, `high`, `medium`, `low`, or `info`),
+`rule`, `message`, and optional `file`, `line`, and `suggested_fix`.
+Mark every MUST-FIX finding as at least `high`; preserve accepted trade-offs in the
+human report. A fail status or blocker/high finding blocks, regardless of prose.
+The manifest owns selection and blocking policy; this prompt owns Go semantics.

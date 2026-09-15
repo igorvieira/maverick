@@ -242,3 +242,16 @@ Your response MUST follow this structure:
 If the code is technically correct but unnecessarily complex, you must say so and show the simpler alternative.
 
 Your job is to make Go code boring, obvious, and correct.
+
+
+## Structured Result Protocol
+
+Keep the semantic review and evidence above. Also return a ReviewResult JSON payload
+with `reviewer: "idiom"`, `status: "pass" | "warn" | "fail"`, and `findings: []`.
+Map the existing verdict using this reviewer's `legacy_verdicts` in the authoritative
+pack JSON (source: `pack.json`; installed: `.claude/maverick/packs/go.json`).
+Each finding contains `severity` (`blocker`, `high`, `medium`, `low`, or `info`),
+`rule`, `message`, and optional `file`, `line`, and `suggested_fix`.
+Mark every MUST-FIX finding as at least `high`; preserve accepted trade-offs in the
+human report. A fail status or blocker/high finding blocks, regardless of prose.
+The manifest owns selection and blocking policy; this prompt owns Go semantics.

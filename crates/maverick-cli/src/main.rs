@@ -1,3 +1,5 @@
+mod packs;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use maverick_core::{ArtifactKind, RunId, RunState};
@@ -20,6 +22,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Load and route declarative packs; never executes commands or creates run storage.
+    Pack(packs::PackArgs),
     /// Create a run and its task artifact. Prints the run as JSON.
     Start {
         #[arg(long)]
@@ -49,6 +53,9 @@ enum Command {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    if let Command::Pack(args) = cli.command {
+        return packs::run(args);
+    }
     // Validate input before opening/creating storage.
     let payload = if let Command::Artifact {
         kind, name, file, ..
@@ -67,6 +74,7 @@ fn main() -> Result<()> {
     let mut store = Store::open(&cli.root)
         .with_context(|| format!("cannot open store at {}", cli.root.display()))?;
     let output = match cli.command {
+        Command::Pack(_) => unreachable!("pack commands return before opening the store"),
         Command::Start { task } => serde_json::to_value(store.start(task)?)?,
         Command::Status { run_id } => serde_json::to_value(store.get(run_id)?)?,
         Command::Transition { run_id, to } => {

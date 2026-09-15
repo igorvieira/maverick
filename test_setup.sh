@@ -127,6 +127,8 @@ assert_file_exists "linear-figma template exists" "$SCRIPT_DIR/claude/templates/
 assert_file_exists "maverick project adapter template exists" "$SCRIPT_DIR/claude/templates/maverick-project.md"
 assert_file_exists "maverick skill exists" "$SCRIPT_DIR/claude/skills/maverick/SKILL.md"
 assert_file_exists "go pack manifest exists" "$SCRIPT_DIR/claude/agents/go/pack.md"
+assert_file_exists "go pack json manifest exists" "$SCRIPT_DIR/claude/agents/go/pack.json"
+assert_file_exists "typescript pack json manifest exists" "$SCRIPT_DIR/claude/agents/typescript/pack.json"
 assert_file_exists "go pack implementer agent exists" "$SCRIPT_DIR/claude/agents/go/go-implementer.md"
 assert_file_exists "Codex AGENTS.md template exists" "$SCRIPT_DIR/codex/AGENTS.md"
 assert_file_exists "Codex config example exists" "$SCRIPT_DIR/codex/config/config.toml.example"
@@ -137,8 +139,9 @@ assert_file_exists "Codex Maverick skill metadata exists" "$SCRIPT_DIR/codex/ski
 echo ""
 echo -e "${YELLOW}3. JSON validity${NC}"
 
-for f in "$SCRIPT_DIR/claude/mcp-servers/global.json" "$SCRIPT_DIR/claude/mcp-servers/project.json"; do
-    fname=$(basename "$f")
+for f in "$SCRIPT_DIR/claude/mcp-servers/global.json" "$SCRIPT_DIR/claude/mcp-servers/project.json" \
+         "$SCRIPT_DIR/claude/agents/go/pack.json" "$SCRIPT_DIR/claude/agents/typescript/pack.json"; do
+    fname=${f#"$SCRIPT_DIR"/}
     TOTAL=$((TOTAL + 1))
     if jq empty "$f" 2>/dev/null; then
         echo -e "  ${GREEN}✓${NC} $fname is valid JSON"
@@ -354,6 +357,7 @@ if [ "$PROJECT_EXIT" -eq 0 ]; then
     assert_file_exists "maverick command installed in project" "$PROJECT_TARGET/.claude/commands/maverick.md"
     assert_file_exists "go agent installed flat in project agents/" "$PROJECT_TARGET/.claude/agents/go-implementer.md"
     assert_file_exists "go pack manifest installed" "$PROJECT_TARGET/.claude/maverick/packs/go.md"
+    assert_file_exists "go structured pack manifest installed" "$PROJECT_TARGET/.claude/maverick/packs/go.json"
     assert_file_exists "adapter template installed" "$PROJECT_TARGET/.claude/maverick/project.md"
 
     TOTAL=$((TOTAL + 1))
@@ -375,6 +379,36 @@ else
     echo -e "  ${RED}✗${NC} setup.sh project failed (exit code: $PROJECT_EXIT)"
     echo -e "    output: $(echo "$OUTPUT" | tail -5)"
     FAILED=$((FAILED + 1))
+fi
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}12. Structured packs and multi-pack installation${NC}"
+
+MULTI_TARGET="$TEST_DIR/multi-pack-repo"
+mkdir -p "$MULTI_TARGET/.claude/maverick"
+printf '%s\n' '{"schema_version":1,"packs":[],"commands":{}}' > "$MULTI_TARGET/.claude/maverick/project.json"
+STRUCTURED_BEFORE=$(cat "$MULTI_TARGET/.claude/maverick/project.json")
+if OUTPUT=$(bash "$SETUP_SCRIPT" project "$MULTI_TARGET" --pack go --pack typescript 2>&1); then
+    assert_eq "multi-pack install succeeds" "0" "0"
+else
+    assert_eq "multi-pack install succeeds" "0" "1"
+fi
+for pack in go typescript; do
+    MANIFEST="$MULTI_TARGET/.claude/maverick/packs/$pack.json"
+    assert_file_exists "$pack structured manifest installed" "$MANIFEST"
+    assert_json_key "$pack manifest uses schema version 1" "$MANIFEST" '.schema_version == 1'
+    assert_file_exists "$pack compatibility pointer installed" "$MULTI_TARGET/.claude/maverick/packs/$pack.md"
+    while IFS= read -r agent; do
+        assert_file_exists "$pack referenced agent installed: $agent" "$MULTI_TARGET/.claude/agents/$agent.md"
+    done < <(jq -r '[.agents.planner, .agents.implementer, .agents.red_team, .reviewers[].agent] | .[] | select(. != null)' "$MANIFEST")
+done
+assert_eq "structured adapter preserved" "$STRUCTURED_BEFORE" "$(cat "$MULTI_TARGET/.claude/maverick/project.json")"
+assert_eq "pack.json not copied into agents" "false" "$(test -f "$MULTI_TARGET/.claude/agents/pack.json" && echo true || echo false)"
+if bash "$SETUP_SCRIPT" project "$MULTI_TARGET" --pack ../go >/dev/null 2>&1; then
+    assert_eq "pack traversal rejected" "rejected" "accepted"
+else
+    assert_eq "pack traversal rejected" "rejected" "rejected"
 fi
 
 # ============================================================

@@ -44,6 +44,30 @@ For multiple independent tickets or tasks:
 - Otherwise, execute sequentially.
 - Use worktrees only when multiple branches need to progress independently.
 
+## Declarative Language Packs
+
+When packs are installed, read `.claude/maverick/packs/<id>.json` and the project
+adapter. JSON is the authoritative manifest; `<id>.md` is a compatibility pointer.
+Use an optional `.claude/maverick/project.json` for explicit pack selection and command
+overrides; keep Markdown-only adapters working. Explicit selection precedes manifest
+file detection. Missing or invalid explicit packs must be reported as errors.
+
+Use planner/implementer slots from the manifest. Route reviewers in declaration order
+using `always` or any intersection with the extensible `classification.json` capabilities.
+Do not classify tasks into a closed frontend/backend enum or select by agent name.
+Keep each reviewer's semantics in its prompt and scope reviewer IDs by pack.
+
+Evaluate red-team gates and fix-loop policies from JSON. Structured fail or blocker/high
+findings block; use the manifest's legacy verdict mapping only for transitional prose.
+Missing or malformed required reviews remain unresolved. Record warning resolutions.
+Resolve commands per pack: adapter override → pack default → absent; per-pack adapter
+overrides win over shared ones. Never invent missing commands. The experimental
+`maverick pack` CLI loads and routes but does not execute commands or agents.
+
+If no pack matches, retain the role playbooks below and explicitly report that no
+specialist panel ran. Do not change the existing rule requiring user authorization
+before using parallel subagents.
+
 ## Role Playbooks
 
 ### Architect
