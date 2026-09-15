@@ -1,4 +1,5 @@
 mod packs;
+mod setup;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -10,18 +11,29 @@ use std::path::PathBuf;
 #[command(
     name = "maverick",
     version,
-    about = "Experimental local execution kernel"
+    about = "Experimental local execution kernel and model setup TUI"
 )]
 struct Cli {
     /// Storage directory (contains maverick.db and runs/).
     #[arg(long, global = true, default_value = ".maverick")]
     root: PathBuf,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
 enum Command {
+    /// Interactive Ratatui setup for local and Grok models.
+    Setup,
+    /// Print the resolved model setup as JSON; never executes providers.
+    Models {
+        /// User config TOML (defaults to $MAVERICK_CONFIG or ~/.config/maverick/config.toml).
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Optional project overlay TOML (defaults to <root>/config.toml when present).
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
     /// Load and route declarative packs; never executes commands or creates run storage.
     Pack(packs::PackArgs),
     /// Create a run and its task artifact. Prints the run as JSON.
@@ -53,13 +65,23 @@ enum Command {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    if let Command::Pack(args) = cli.command {
-        return packs::run(args);
+    match cli.command {
+        None => {
+            return setup::run_entry(setup::paths_from(None, None, cli.root));
+        }
+        Some(Command::Setup) => {
+            return setup::run_tui(setup::paths_from(None, None, cli.root));
+        }
+        Some(Command::Models { config, project }) => {
+            return setup::print_models(setup::paths_from(config, project, cli.root));
+        }
+        Some(Command::Pack(args)) => return packs::run(args),
+        Some(_) => {}
     }
     // Validate input before opening/creating storage.
-    let payload = if let Command::Artifact {
+    let payload = if let Some(Command::Artifact {
         kind, name, file, ..
-    } = &cli.command
+    }) = &cli.command
     {
         kind.validate_name(name)?;
         let bytes =
@@ -74,22 +96,24 @@ fn main() -> Result<()> {
     let mut store = Store::open(&cli.root)
         .with_context(|| format!("cannot open store at {}", cli.root.display()))?;
     let output = match cli.command {
-        Command::Pack(_) => unreachable!("pack commands return before opening the store"),
-        Command::Start { task } => serde_json::to_value(store.start(task)?)?,
-        Command::Status { run_id } => serde_json::to_value(store.get(run_id)?)?,
-        Command::Transition { run_id, to } => {
+        None | Some(Command::Setup) | Some(Command::Models { .. }) | Some(Command::Pack(_)) => {
+            unreachable!("setup and pack commands return before opening the store")
+        }
+        Some(Command::Start { task }) => serde_json::to_value(store.start(task)?)?,
+        Some(Command::Status { run_id }) => serde_json::to_value(store.get(run_id)?)?,
+        Some(Command::Transition { run_id, to }) => {
             let previous = store.get(run_id)?;
             serde_json::to_value(store.transition(&previous, to)?)?
         }
-        Command::Artifact {
+        Some(Command::Artifact {
             run_id, kind, name, ..
-        } => serde_json::to_value(store.put_artifact(
+        }) => serde_json::to_value(store.put_artifact(
             run_id,
             kind,
             &name,
             payload.context("missing artifact payload")?,
         )?)?,
-        Command::History { run_id } => serde_json::to_value(store.history(run_id)?)?,
+        Some(Command::History { run_id }) => serde_json::to_value(store.history(run_id)?)?,
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
