@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   test:
@@ -63,5 +62,5 @@ jobs:
       - name: Lint Rust
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Test Rust kernel
+      - name: Test Rust workspace
         run: cargo test --workspace --all-features
