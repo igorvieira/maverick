@@ -6,6 +6,41 @@ My personal AI coding configuration with MCPs, skills, commands, agent packs, an
 
 <img width="702" height="300" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/f42be722-0cdb-4961-9a70-624bb87a0a4f" />
 
+## Install the harness
+
+Three commands. That is the whole install.
+
+```bash
+git clone https://github.com/igorvieira/maverick.git
+cd maverick
+
+./setup.sh all                                      # once, on this machine
+./setup.sh project /path/to/your/repo --pack go     # once per repo
+```
+
+`all` installs Claude Code MCPs and the Codex skill. Use `./setup.sh claude` or `./setup.sh codex` if you only want one. The matching CLI (`claude` and/or `codex`) must already be on your PATH.
+
+The project step copies the workflow into that repo's `.claude/`: skill, commands, the selected language pack, and `.claude/maverick/project.md` if it is missing. It never overwrites an existing adapter.
+
+Then fill **only** `.claude/maverick/project.md` with this repo's facts (build/test commands, layout, ticket prefix). No secrets. Open the repo in Claude Code or Codex and run:
+
+```text
+/maverick TICKET-123
+/maverick --local "Add dark mode toggle"
+```
+
+Add another pack the same way: `./setup.sh project /path/to/your/repo --pack typescript`.
+
+| You want | Command |
+|---|---|
+| Claude + Codex on this machine | `./setup.sh all` |
+| Only Claude Code | `./setup.sh claude` |
+| Only Codex | `./setup.sh codex` |
+| Harness inside a Go repo | `./setup.sh project <repo> --pack go` |
+| Go + TypeScript in the same repo | `./setup.sh project <repo> --pack go --pack typescript` |
+
+`./setup.sh` with no arguments opens a small menu. For Codex, also copy `codex/AGENTS.md` into the consuming repo if you want the project template. The experimental Rust binary is optional and is not part of this install; see [Experimental Rust Runtime](#experimental-rust-runtime).
+
 ## The Three Layers
 
 Maverick is **project-agnostic and language-agnostic** by construction. It separates:
@@ -255,39 +290,6 @@ Opening the store currently checks all latest artifacts, so startup cost grows w
 the local index. Back up the entire storage directory while no process is writing.
 This experimental schema has no migration path to future versions yet.
 
-## Installation
-
-### Into a project (recommended)
-
-```bash
-./setup.sh project /path/to/your/repo --pack go
-```
-
-This installs into the repo's `.claude/`:
-- the maverick skill + commands
-- the go pack agents (flat in `.claude/agents/`) and its manifest (`.claude/maverick/packs/go.json`; `go.md` is a compatibility pointer)
-- the **project adapter template** at `.claude/maverick/project.md` (never overwrites an existing one)
-
-Then **fill the adapter** with your repo's facts — commands, layout, migration workflow,
-conventions, ticket prefix. That file is the only place project-specific knowledge should live.
-Never put secrets in it.
-
-### Global Claude Code assets (MCPs)
-
-```bash
-./setup.sh claude
-```
-
-### Codex
-
-```bash
-./setup.sh codex
-cp codex/AGENTS.md /path/to/your/project/AGENTS.md
-```
-
-Running `./setup.sh` without arguments opens an interactive selector; `./setup.sh all` installs
-Claude + Codex global assets.
-
 ## The Maverick Workflow
 
 Maverick coordinates agents to complete tasks end-to-end. Works with Linear tickets or standalone
@@ -437,10 +439,9 @@ The plugin is available in the official Claude Code marketplace.
 
 ## Requirements
 
-- Claude Code CLI installed for Claude setup
-- Codex CLI installed for Codex setup
-- Node.js (for stdio MCPs)
-- Python/uvx (for serena and basic-memory)
+- `claude` and/or `codex` on PATH before `./setup.sh`
+- Node.js for stdio MCPs; Python/`uvx` for Serena and Basic Memory
+- Optional: a stable Rust toolchain only if you want the experimental `maverick` binary
 
 ## License
 
