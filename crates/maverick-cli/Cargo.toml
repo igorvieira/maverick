@@ -1,0 +1,19 @@
+[package]
+name = "maverick-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "maverick"
+path = "src/main.rs"
+
+[dependencies]
+maverick-core.workspace = true
+maverick-store.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
