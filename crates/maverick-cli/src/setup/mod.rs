@@ -1,7 +1,9 @@
 mod app;
 mod config;
 mod discover;
+mod theme;
 mod tui;
+mod view;
 
 use config::load_setup;
 pub use config::ConfigPaths;

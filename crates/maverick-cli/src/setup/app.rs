@@ -1,11 +1,5 @@
 use maverick_core::{ModelRef, ModelSetup, ProviderConfig, ProviderKind};
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, List, ListItem, ListState, Paragraph},
-    Frame,
-};
+use ratatui::widgets::ListState;
 
 const KINDS: [ProviderKind; 6] = [
     ProviderKind::Grok,
@@ -33,6 +27,7 @@ pub enum Key {
     Up,
     Down,
     Tab,
+    BackTab,
     Backspace,
 }
 
@@ -44,10 +39,20 @@ pub enum Action {
     Rediscover,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddField {
+    Kind,
+    Id,
+    DisplayName,
+    BaseUrl,
+    AuthEnv,
+    Models,
+}
+
 #[derive(Debug, Clone)]
 pub struct AddForm {
     pub kind: usize,
-    pub field: usize,
+    pub field: AddField,
     pub id: String,
     pub display_name: String,
     pub base_url: String,
@@ -60,13 +65,38 @@ impl Default for AddForm {
     fn default() -> Self {
         Self {
             kind: 5,
-            field: 0,
+            field: AddField::Kind,
             id: String::new(),
             display_name: String::new(),
             base_url: "http://127.0.0.1:11434/v1".into(),
             auth_env: String::new(),
             models: String::new(),
             error: None,
+        }
+    }
+}
+
+impl AddForm {
+    pub fn provider_kind(&self) -> ProviderKind {
+        KINDS[self.kind]
+    }
+
+    pub fn visible_fields(&self) -> Vec<AddField> {
+        let kind = self.provider_kind();
+        let mut fields = vec![AddField::Kind, AddField::Id, AddField::DisplayName];
+        if kind.requires_base_url() {
+            fields.push(AddField::BaseUrl);
+        }
+        if matches!(kind, ProviderKind::XaiApi | ProviderKind::OpenAiCompatible) {
+            fields.push(AddField::AuthEnv);
+        }
+        fields.push(AddField::Models);
+        fields
+    }
+
+    fn clamp_field(&mut self) {
+        if !self.visible_fields().contains(&self.field) {
+            self.field = AddField::Kind;
         }
     }
 }
@@ -91,12 +121,13 @@ impl App {
             selected: 0,
             list_state: ListState::default(),
             dirty: false,
-            status: "enter default · space planner · a add · g grok · s save · q quit".into(),
+            status: String::new(),
             grok_cli,
             xai_key,
             add: AddForm::default(),
         };
         app.sync_list();
+        app.status = app.ready_status();
         app
     }
 
@@ -111,6 +142,22 @@ impl App {
                     .filter_map(|model| ModelRef::new(&p.id, model).ok())
             })
             .collect()
+    }
+
+    fn ready_status(&self) -> String {
+        let n = self.entries().len();
+        if n == 0 {
+            "no models yet".into()
+        } else if self.dirty {
+            format!("unsaved · {n} model(s)")
+        } else {
+            format!("{n} model(s)")
+        }
+    }
+
+    fn show_models(&mut self) {
+        self.screen = Screen::Models;
+        self.status = self.ready_status();
     }
 
     fn sync_list(&mut self) {
@@ -129,8 +176,8 @@ impl App {
             Screen::Models => self.handle_models(key),
             Screen::Add => self.handle_add(key),
             Screen::Grok | Screen::Help => {
-                if matches!(key, Key::Esc | Key::Char('q') | Key::Enter) {
-                    self.screen = Screen::Models;
+                if matches!(key, Key::Esc | Key::Char('q') | Key::Enter | Key::Char('?')) {
+                    self.show_models();
                 }
                 Action::None
             }
@@ -138,7 +185,7 @@ impl App {
                 Key::Char('y') | Key::Enter => Action::Quit,
                 Key::Char('s') => Action::Save,
                 _ => {
-                    self.screen = Screen::Models;
+                    self.show_models();
                     Action::None
                 }
             },
@@ -150,7 +197,7 @@ impl App {
             Key::Char('q') | Key::Esc => {
                 if self.dirty {
                     self.screen = Screen::ConfirmQuit;
-                    self.status = "unsaved changes: y quit · s save · other cancel".into();
+                    self.status = "unsaved changes".into();
                     Action::None
                 } else {
                     Action::Quit
@@ -161,13 +208,15 @@ impl App {
             Key::Char('a') => {
                 self.add = AddForm::default();
                 self.screen = Screen::Add;
+                self.status = "add provider".into();
                 Action::None
             }
             Key::Char('g') => {
                 self.screen = Screen::Grok;
+                self.status = "grok details".into();
                 Action::None
             }
-            Key::Char('?') => {
+            Key::Char('?') | Key::Char('h') => {
                 self.screen = Screen::Help;
                 Action::None
             }
@@ -189,10 +238,10 @@ impl App {
             }
             Key::Enter => {
                 if let Some(model) = self.entries().get(self.selected).cloned() {
-                    match self.setup.set_default(model) {
+                    match self.setup.set_default(model.clone()) {
                         Ok(()) => {
                             self.dirty = true;
-                            self.status = "default updated".into();
+                            self.status = format!("default {}/{}", model.provider, model.model);
                         }
                         Err(e) => self.status = e.to_string(),
                     }
@@ -219,14 +268,18 @@ impl App {
     fn handle_add(&mut self, key: Key) -> Action {
         match key {
             Key::Esc => {
-                self.screen = Screen::Models;
+                self.show_models();
                 Action::None
             }
             Key::Tab => {
-                self.add.field = (self.add.field + 1) % 6;
+                self.cycle_field(false);
                 Action::None
             }
-            Key::Up | Key::Down if self.add.field == 0 => {
+            Key::BackTab => {
+                self.cycle_field(true);
+                Action::None
+            }
+            Key::Up | Key::Down if self.add.field == AddField::Kind => {
                 let delta = if matches!(key, Key::Down) {
                     1
                 } else {
@@ -239,28 +292,48 @@ impl App {
                         _ => "http://127.0.0.1:11434/v1".into(),
                     };
                 }
+                self.add.clamp_field();
                 Action::None
             }
             Key::Enter => self.submit_add(),
             Key::Backspace => {
-                self.edit_field().pop();
+                if let Some(value) = self.edit_field() {
+                    value.pop();
+                }
                 Action::None
             }
-            Key::Char(c) if self.add.field > 0 && !c.is_control() => {
-                self.edit_field().push(c);
+            Key::Char(c) if self.add.field != AddField::Kind && !c.is_control() => {
+                if let Some(value) = self.edit_field() {
+                    value.push(c);
+                }
                 Action::None
             }
             _ => Action::None,
         }
     }
 
-    fn edit_field(&mut self) -> &mut String {
+    fn cycle_field(&mut self, reverse: bool) {
+        let fields = self.add.visible_fields();
+        let Some(i) = fields.iter().position(|f| *f == self.add.field) else {
+            self.add.field = fields[0];
+            return;
+        };
+        let next = if reverse {
+            (i + fields.len() - 1) % fields.len()
+        } else {
+            (i + 1) % fields.len()
+        };
+        self.add.field = fields[next];
+    }
+
+    fn edit_field(&mut self) -> Option<&mut String> {
         match self.add.field {
-            1 => &mut self.add.id,
-            2 => &mut self.add.display_name,
-            3 => &mut self.add.base_url,
-            4 => &mut self.add.auth_env,
-            _ => &mut self.add.models,
+            AddField::Id => Some(&mut self.add.id),
+            AddField::DisplayName => Some(&mut self.add.display_name),
+            AddField::BaseUrl => Some(&mut self.add.base_url),
+            AddField::AuthEnv => Some(&mut self.add.auth_env),
+            AddField::Models => Some(&mut self.add.models),
+            AddField::Kind => None,
         }
     }
 
@@ -290,9 +363,9 @@ impl App {
         match self.setup.add_provider(provider) {
             Ok(()) => {
                 self.dirty = true;
-                self.screen = Screen::Models;
-                self.status = "provider added".into();
                 self.sync_list();
+                self.status = "provider added".into();
+                self.screen = Screen::Models;
             }
             Err(e) => self.add.error = Some(e.to_string()),
         }
@@ -311,192 +384,10 @@ impl App {
     }
 }
 
-pub fn render(frame: &mut Frame, app: &mut App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(5),
-            Constraint::Length(3),
-        ])
-        .split(frame.area());
-    render_header(frame, chunks[0], app);
-    match app.screen {
-        Screen::Models | Screen::ConfirmQuit => render_models(frame, chunks[1], app),
-        Screen::Add => render_add(frame, chunks[1], app),
-        Screen::Grok => render_grok(frame, chunks[1], app),
-        Screen::Help => render_help(frame, chunks[1]),
-    }
-    let footer = match app.screen {
-        Screen::ConfirmQuit => app.status.as_str(),
-        _ => app.status.as_str(),
-    };
-    frame.render_widget(
-        Paragraph::new(footer).block(Block::bordered().title("Status")),
-        chunks[2],
-    );
-}
-
-fn render_header(frame: &mut Frame, area: Rect, app: &App) {
-    let default = app
-        .setup
-        .default
-        .as_ref()
-        .map(|m| format!("{}/{}", m.provider, m.model))
-        .unwrap_or_else(|| "none".into());
-    let grok = if app.grok_cli {
-        "CLI present"
-    } else {
-        "CLI missing"
-    };
-    let api = if app.xai_key {
-        "XAI_API_KEY set"
-    } else {
-        "XAI_API_KEY unset"
-    };
-    let title = format!(
-        "Maverick models  default {default}  planner {}  grok {grok}  {api}",
-        app.setup.planner().len()
-    );
-    frame.render_widget(
-        Paragraph::new(title).block(Block::bordered().title("Setup")),
-        area,
-    );
-}
-
-fn render_models(frame: &mut Frame, area: Rect, app: &mut App) {
-    let planner = app.setup.planner().to_vec();
-    let default = app.setup.default.clone();
-    let items: Vec<ListItem> = app
-        .entries()
-        .into_iter()
-        .map(|model| {
-            let mut marks = vec![];
-            if default.as_ref() == Some(&model) {
-                marks.push("default");
-            }
-            if planner.contains(&model) {
-                marks.push("planner");
-            }
-            let suffix = if marks.is_empty() {
-                String::new()
-            } else {
-                format!("  [{}]", marks.join(" "))
-            };
-            ListItem::new(format!("{}/{}{suffix}", model.provider, model.model))
-        })
-        .collect();
-    let list = if items.is_empty() {
-        List::new(vec![ListItem::new(
-            "No models yet. Press a to add a provider, or install grok/ollama.",
-        )])
-    } else {
-        List::new(items)
-            .highlight_symbol("> ")
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-    };
-    frame.render_stateful_widget(
-        list.block(Block::bordered().title("Models")),
-        area,
-        &mut app.list_state,
-    );
-}
-
-fn render_add(frame: &mut Frame, area: Rect, app: &App) {
-    let kind = format!("{:?}", KINDS[app.add.kind]);
-    let cursor = |i: usize, label: &str, value: &str| {
-        let mark = if app.add.field == i { ">" } else { " " };
-        Line::from(format!("{mark} {label}: {value}"))
-    };
-    let mut lines = vec![
-        cursor(0, "kind", &kind),
-        cursor(1, "id", &app.add.id),
-        cursor(2, "display_name", &app.add.display_name),
-        cursor(3, "base_url", &app.add.base_url),
-        cursor(4, "auth_env", &app.add.auth_env),
-        cursor(5, "models", &app.add.models),
-        Line::from("tab fields · up/down kind · enter save · esc cancel"),
-        Line::from("auth_env is the variable NAME (XAI_API_KEY). Do not paste secrets."),
-    ];
-    if let Some(error) = &app.add.error {
-        lines.push(Line::from(Span::raw(error.clone())));
-    }
-    frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title("Add provider")),
-        area,
-    );
-}
-
-fn render_grok(frame: &mut Frame, area: Rect, app: &App) {
-    let grok = app
-        .setup
-        .providers
-        .iter()
-        .find(|p| p.kind == ProviderKind::Grok);
-    let api = app
-        .setup
-        .providers
-        .iter()
-        .find(|p| p.kind == ProviderKind::XaiApi);
-    let models = grok
-        .map(|p| p.models.join(", "))
-        .unwrap_or_else(|| "none discovered".into());
-    let lines = vec![
-        Line::from(format!(
-            "Grok CLI: {}",
-            if app.grok_cli {
-                "available"
-            } else {
-                "not on PATH"
-            }
-        )),
-        Line::from(format!("CLI models: {models}")),
-        Line::from(format!(
-            "xAI API provider: {}",
-            if api.is_some() {
-                "configured"
-            } else {
-                "absent"
-            }
-        )),
-        Line::from(format!(
-            "XAI_API_KEY: {}",
-            if app.xai_key {
-                "set in environment"
-            } else {
-                "unset"
-            }
-        )),
-        Line::from("Grok is a provider implementation, not the runtime's internal model."),
-        Line::from("To use the API directly: export XAI_API_KEY and press r to rediscover."),
-        Line::from("This screen does not launch the grok TUI."),
-        Line::from("Planning can include every model marked [planner]; execution comes later."),
-    ];
-    frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title("Grok")),
-        area,
-    );
-}
-
-fn render_help(frame: &mut Frame, area: Rect) {
-    let text = "\
-enter  set default model
-space  toggle planner panel (order preserved)
-a      add provider (OpenAI-compatible, Ollama, xAI API, CLIs)
-g      Grok details
-r      rediscover local CLIs (does not save)
-s      save user config
-q      quit
-Models stay data. The kernel does not call providers in this slice.";
-    frame.render_widget(
-        Paragraph::new(text).block(Block::bordered().title("Help")),
-        area,
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::setup::view::render;
     use maverick_core::{ProviderConfig, ProviderKind};
     use ratatui::{backend::TestBackend, Terminal};
 
@@ -519,13 +410,14 @@ mod tests {
     fn visible(app: &mut App) -> String {
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         terminal.draw(|f| render(f, app)).unwrap();
-        terminal
-            .backend()
-            .buffer()
-            .content()
-            .iter()
-            .map(|c| c.symbol())
-            .collect()
+        let buf = terminal.backend().buffer();
+        let mut out = String::new();
+        for y in 0..24u16 {
+            for x in 0..80u16 {
+                out.push_str(buf[(x, y)].symbol());
+            }
+        }
+        out
     }
 
     #[test]
@@ -560,6 +452,9 @@ mod tests {
         assert!(text.contains("grok-4.6"));
         assert!(text.contains("default"));
         assert!(text.contains("planner"));
+        assert!(text.contains("Grok CLI"));
+        assert!(text.contains("MAVERICK"));
+        assert!(text.contains("Selected"));
     }
 
     #[test]
@@ -567,15 +462,18 @@ mod tests {
         let mut app = App::new(ModelSetup::default(), false, false);
         app.handle(Key::Char('a'));
         assert_eq!(app.screen, Screen::Add);
+        let add_text = visible(&mut app);
+        assert!(add_text.contains("OpenAI-compatible"));
+        assert!(add_text.contains("Do not paste secrets"));
         for c in "local-llm".chars() {
-            app.add.field = 1;
+            app.add.field = AddField::Id;
             app.handle(Key::Char(c));
         }
-        app.add.field = 2;
+        app.add.field = AddField::DisplayName;
         for c in "Local".chars() {
             app.handle(Key::Char(c));
         }
-        app.add.field = 5;
+        app.add.field = AddField::Models;
         for c in "llama3.2".chars() {
             app.handle(Key::Char(c));
         }
@@ -585,5 +483,57 @@ mod tests {
         assert_eq!(app.setup.providers[0].models, ["llama3.2"]);
         let text = visible(&mut app);
         assert!(text.contains("local-llm/llama3.2"));
+    }
+
+    #[test]
+    fn empty_state_explains_how_to_start() {
+        let mut app = App::new(ModelSetup::default(), false, false);
+        let text = visible(&mut app);
+        assert!(text.contains("No models yet"));
+        assert!(text.contains("OpenAI-compatible"));
+        assert!(text.contains("Grok CLI is not on PATH"));
+    }
+
+    #[test]
+    fn help_and_quit_are_overlays_on_the_model_list() {
+        let mut app = App::new(grok_setup(), true, false);
+        app.handle(Key::Enter);
+        app.handle(Key::Char('?'));
+        let help = visible(&mut app);
+        assert!(help.contains("grok-4.6"));
+        assert!(help.contains("Help"));
+        assert!(help.contains("set default model"));
+        app.handle(Key::Esc);
+        assert_eq!(app.screen, Screen::Models);
+        app.handle(Key::Char('q'));
+        let quit = visible(&mut app);
+        assert_eq!(app.screen, Screen::ConfirmQuit);
+        assert!(quit.contains("unsaved changes"));
+        assert!(quit.contains("grok-4.6"));
+        app.handle(Key::Esc);
+        assert_eq!(app.screen, Screen::Models);
+    }
+
+    #[test]
+    fn tab_skips_fields_that_the_kind_does_not_use() {
+        let mut app = App::new(ModelSetup::default(), false, false);
+        app.handle(Key::Char('a'));
+        assert_eq!(app.add.provider_kind(), ProviderKind::OpenAiCompatible);
+        app.handle(Key::Tab);
+        assert_eq!(app.add.field, AddField::Id);
+        app.add.field = AddField::Kind;
+        for _ in 0..5 {
+            app.handle(Key::Up);
+        }
+        assert_eq!(app.add.provider_kind(), ProviderKind::Grok);
+        assert!(!app.add.visible_fields().contains(&AddField::BaseUrl));
+        assert!(!app.add.visible_fields().contains(&AddField::AuthEnv));
+        app.add.field = AddField::Kind;
+        app.handle(Key::Tab);
+        app.handle(Key::Tab);
+        app.handle(Key::Tab);
+        assert_eq!(app.add.field, AddField::Models);
+        app.handle(Key::BackTab);
+        assert_eq!(app.add.field, AddField::DisplayName);
     }
 }

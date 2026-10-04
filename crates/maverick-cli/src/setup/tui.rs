@@ -14,7 +14,7 @@ pub fn run(paths: ConfigPaths) -> Result<()> {
     let xai_key = SystemProbe.env("XAI_API_KEY").is_some();
     let mut app = App::new(setup, grok_cli, xai_key);
     ratatui::run(|terminal: &mut DefaultTerminal| loop {
-        terminal.draw(|frame| super::app::render(frame, &mut app))?;
+        terminal.draw(|frame| super::view::render(frame, &mut app))?;
         let Some(key) = event::read()?.as_key_press_event() else {
             continue;
         };
@@ -25,6 +25,7 @@ pub fn run(paths: ConfigPaths) -> Result<()> {
             KeyCode::Up => Key::Up,
             KeyCode::Down => Key::Down,
             KeyCode::Tab => Key::Tab,
+            KeyCode::BackTab => Key::BackTab,
             KeyCode::Backspace => Key::Backspace,
             _ => continue,
         };
