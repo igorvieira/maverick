@@ -388,24 +388,27 @@ selection/detection rules, aggregation, adapter format, compatibility, and limit
 
 ## MCP Servers
 
-### Global
-- **serena** - Intelligent code agent
-- **figma** - Figma integration (design)
+Pick what you actually need instead of installing everything:
 
-### Per Project
-- **linear** - Linear integration (tasks)
-- **github** - GitHub API (PRs, issues, repos)
-- **chrome-devtools** - Chrome DevTools
-- **basic-memory** - Persistent memory
+```bash
+cargo run -p maverick-cli -- mcp          # interactive picker
+cargo run -p maverick-cli -- mcp --list   # same matrix as JSON
+```
 
-| MCP | Type | Use |
-|-----|------|-----|
-| Figma | HTTP | Design to code |
-| Linear | HTTP | Task management |
-| GitHub | stdio | GitHub API (PRs, issues, repos) |
-| Serena | stdio | Code agent |
-| Chrome DevTools | stdio | Browser debugging |
-| Basic Memory | stdio | Persistent memory |
+The picker shows each suggested server against Claude Code, Codex and Grok (`●` active,
+`○` not installed, `! stale` only in a file the agent ignores, `✗` blocked by a missing
+binary/env var). Mark cells with `space`, review the exact `claude|codex|grok mcp add` commands,
+and confirm. It never removes servers and never writes secrets: the GitHub token is read from
+`GITHUB_PAT` at runtime.
+
+| MCP | Type | Default scope | Use |
+|-----|------|---------------|-----|
+| Serena | stdio | user | Code agent |
+| Figma | HTTP | user | Design to code (OAuth) |
+| Linear | HTTP | project | Task management (OAuth) |
+| GitHub | HTTP (remote, `GITHUB_PAT`) | project | PRs, issues, repos |
+| Chrome DevTools | stdio | project | Browser debugging |
+| Basic Memory | stdio | project | Persistent memory |
 
 ## Critical Rules
 

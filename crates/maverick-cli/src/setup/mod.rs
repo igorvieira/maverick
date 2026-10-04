@@ -1,7 +1,7 @@
 mod app;
 mod config;
-mod discover;
-mod theme;
+pub(crate) mod discover;
+pub(crate) mod theme;
 mod tui;
 mod view;
 

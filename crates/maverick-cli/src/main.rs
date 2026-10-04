@@ -1,3 +1,4 @@
+mod mcp;
 mod packs;
 mod setup;
 
@@ -33,6 +34,12 @@ enum Command {
         /// Optional project overlay TOML (defaults to <root>/config.toml when present).
         #[arg(long)]
         project: Option<PathBuf>,
+    },
+    /// Pick suggested MCP servers to install for Claude, Codex and Grok.
+    Mcp {
+        /// Print the catalog status as JSON instead of opening the picker.
+        #[arg(long)]
+        list: bool,
     },
     /// Load and route declarative packs; never executes commands or creates run storage.
     Pack(packs::PackArgs),
@@ -75,6 +82,7 @@ fn main() -> Result<()> {
         Some(Command::Models { config, project }) => {
             return setup::print_models(setup::paths_from(config, project, cli.root));
         }
+        Some(Command::Mcp { list }) => return mcp::run_entry(list),
         Some(Command::Pack(args)) => return packs::run(args),
         Some(_) => {}
     }
@@ -96,8 +104,12 @@ fn main() -> Result<()> {
     let mut store = Store::open(&cli.root)
         .with_context(|| format!("cannot open store at {}", cli.root.display()))?;
     let output = match cli.command {
-        None | Some(Command::Setup) | Some(Command::Models { .. }) | Some(Command::Pack(_)) => {
-            unreachable!("setup and pack commands return before opening the store")
+        None
+        | Some(Command::Setup)
+        | Some(Command::Models { .. })
+        | Some(Command::Mcp { .. })
+        | Some(Command::Pack(_)) => {
+            unreachable!("setup, mcp and pack commands return before opening the store")
         }
         Some(Command::Start { task }) => serde_json::to_value(store.start(task)?)?,
         Some(Command::Status { run_id }) => serde_json::to_value(store.get(run_id)?)?,
