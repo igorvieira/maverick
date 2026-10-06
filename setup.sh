@@ -95,15 +95,33 @@ install_claude() {
     echo ""
     echo "Configuring global MCPs..."
 
-    GLOBAL_MCPS=$(cat "$SCRIPT_DIR/claude/mcp-servers/global.json")
+    # Claude Code loads MCP servers from ~/.claude.json (user scope), never from settings.json,
+    # so register them through the CLI instead of editing JSON by hand.
+    GLOBAL_JSON="$SCRIPT_DIR/claude/mcp-servers/global.json"
+    for name in $(jq -r '.mcpServers | keys[]' "$GLOBAL_JSON"); do
+        if claude mcp get "$name" &> /dev/null; then
+            echo "  $name already configured, skipping"
+            continue
+        fi
+        server=$(jq -c --arg name "$name" '.mcpServers[$name]' "$GLOBAL_JSON")
+        if claude mcp add-json --scope user "$name" "$server"; then
+            echo "  $name added (user scope)"
+        else
+            echo "  failed to add $name; run: claude mcp add-json --scope user $name '$server'" >&2
+        fi
+    done
 
-    if [ -f "$CLAUDE_SETTINGS_FILE" ]; then
-        EXISTING=$(cat "$CLAUDE_SETTINGS_FILE")
-        MERGED=$(echo "$EXISTING" | jq --argjson new "$(echo "$GLOBAL_MCPS" | jq '.mcpServers')" '.mcpServers = (.mcpServers // {}) + $new')
-        echo "$MERGED" > "$CLAUDE_SETTINGS_FILE"
-    else
-        mkdir -p "$CLAUDE_DIR"
-        echo "$GLOBAL_MCPS" | jq '{mcpServers: .mcpServers}' > "$CLAUDE_SETTINGS_FILE"
+    # Older versions of this script wrote the servers into settings.json, where they are ignored.
+    if [ -f "$CLAUDE_SETTINGS_FILE" ] && jq -e '.mcpServers' "$CLAUDE_SETTINGS_FILE" &> /dev/null; then
+        CLEANED=$(jq --slurpfile catalog "$GLOBAL_JSON" '
+            .mcpServers |= with_entries(select(.key as $k | $catalog[0].mcpServers | has($k) | not))
+            | if .mcpServers == {} then del(.mcpServers) else . end' "$CLAUDE_SETTINGS_FILE")
+        echo "$CLEANED" > "$CLAUDE_SETTINGS_FILE"
+        LEFTOVER=$(jq -r '(.mcpServers // {}) | keys | join(", ")' "$CLAUDE_SETTINGS_FILE")
+        if [ -n "$LEFTOVER" ]; then
+            echo "  note: settings.json still lists MCPs Claude Code ignores: $LEFTOVER"
+            echo "        move them with: claude mcp add-json --scope user <name> '<json>'"
+        fi
     fi
 
     echo "Global MCPs configured"
@@ -124,6 +142,10 @@ install_claude() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         SOUND_FILE="/System/Library/Sounds/Funk.aiff"
         if [ -f "$SOUND_FILE" ]; then
+            if [ ! -f "$CLAUDE_SETTINGS_FILE" ]; then
+                mkdir -p "$CLAUDE_DIR"
+                echo '{}' > "$CLAUDE_SETTINGS_FILE"
+            fi
             EXISTING=$(cat "$CLAUDE_SETTINGS_FILE")
             HAS_HOOKS=$(echo "$EXISTING" | jq 'has("hooks")')
             if [ "$HAS_HOOKS" = "false" ]; then
@@ -147,8 +169,8 @@ install_claude() {
     echo "  - serena"
     echo "  - figma"
     echo ""
-    echo "To add per-project MCPs, copy the content from:"
-    echo "  $SCRIPT_DIR/claude/mcp-servers/project.json"
+    echo "To pick per-project MCPs (Claude, Codex, Grok):"
+    echo "  cargo run -p maverick-cli -- mcp"
     echo ""
     echo "To use the CLAUDE.md template:"
     echo "  cp $SCRIPT_DIR/claude/templates/linear-figma.md /path/to/project/CLAUDE.md"

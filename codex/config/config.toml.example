@@ -6,11 +6,6 @@
 trust_level = "trusted"
 
 # Stdio MCP server examples.
-[mcp_servers.github]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_PERSONAL_ACCESS_TOKEN = "<your-github-token>" }
-
 [mcp_servers."chrome-devtools"]
 command = "npx"
 args = ["-y", "chrome-devtools-mcp@latest"]
@@ -25,6 +20,11 @@ url = "https://mcp.figma.com/mcp"
 
 [mcp_servers.linear]
 url = "https://mcp.linear.app/mcp"
+
+# Official remote GitHub server; the token is read from GITHUB_PAT at runtime.
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_PAT"
 
 # Serena can be useful for large codebases.
 [mcp_servers.serena]
