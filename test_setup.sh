@@ -186,52 +186,62 @@ done
 echo ""
 echo -e "${YELLOW}6. Setup dry-run (isolated environment)${NC}"
 
+# claude stub that records every call; `mcp get` succeeds only for names in $HOME/claude-existing.
+create_claude_stub() {
+    local dir="$1"
+    mkdir -p "$dir"
+    cat > "$dir/claude" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HOME/claude-calls.log"
+if [ "$1 $2" = "mcp get" ]; then
+    grep -qx "$3" "$HOME/claude-existing" 2>/dev/null
+    exit $?
+fi
+exit 0
+EOF
+    chmod +x "$dir/claude"
+}
+
 # Create isolated HOME to test setup without touching real settings
 FAKE_HOME="$TEST_DIR/home"
 mkdir -p "$FAKE_HOME/.claude"
-create_stub_bin "$FAKE_HOME/bin" "claude"
+create_claude_stub "$FAKE_HOME/bin"
 create_stub_bin "$FAKE_HOME/bin" "uvx"
 
 # Run Claude setup with overridden HOME
 OUTPUT=$(HOME="$FAKE_HOME" PATH="$FAKE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" claude 2>&1) || true
-SETUP_EXIT=$?
+CALLS=$(cat "$FAKE_HOME/claude-calls.log" 2>/dev/null)
 
-SETTINGS_RESULT="$FAKE_HOME/.claude/settings.json"
+assert_contains "serena added via claude mcp add-json (user scope)" "$CALLS" "mcp add-json --scope user serena"
+assert_contains "figma added via claude mcp add-json (user scope)" "$CALLS" "mcp add-json --scope user figma"
+assert_contains "serena JSON carries its uvx command" "$CALLS" '"command":"uvx"'
 
-if [ -f "$SETTINGS_RESULT" ]; then
-    assert_file_exists "settings.json was created" "$SETTINGS_RESULT"
-    assert_json_key "settings.json has mcpServers" "$SETTINGS_RESULT" ".mcpServers"
-    assert_json_key "serena was added to settings" "$SETTINGS_RESULT" ".mcpServers.serena"
-
-    RESULT_CMD=$(jq -r '.mcpServers.serena.command' "$SETTINGS_RESULT")
-    assert_eq "serena command in settings is 'uvx'" "uvx" "$RESULT_CMD"
-
-    assert_json_key "figma was added to settings" "$SETTINGS_RESULT" ".mcpServers.figma"
-else
-    TOTAL=$((TOTAL + 1))
-    echo -e "  ${RED}✗${NC} setup.sh did not create settings.json (exit code: $SETUP_EXIT)"
-    echo -e "    output: $(echo "$OUTPUT" | tail -5)"
-    FAILED=$((FAILED + 1))
-fi
+MCP_IN_SETTINGS=$(jq -r 'has("mcpServers")' "$FAKE_HOME/.claude/settings.json" 2>/dev/null || echo "false")
+assert_eq "no mcpServers written to settings.json" "false" "$MCP_IN_SETTINGS"
 
 assert_contains "setup output shows completion" "$OUTPUT" "Setup complete"
 
 # ----------------------------------------------------------
 echo ""
-echo -e "${YELLOW}7. Setup with existing settings (merge test)${NC}"
+echo -e "${YELLOW}7. Re-run with legacy settings.json MCPs (migration test)${NC}"
 
 MERGE_HOME="$TEST_DIR/merge_home"
 mkdir -p "$MERGE_HOME/.claude"
-create_stub_bin "$MERGE_HOME/bin" "claude"
+create_claude_stub "$MERGE_HOME/bin"
 create_stub_bin "$MERGE_HOME/bin" "uvx"
+echo "serena" > "$MERGE_HOME/claude-existing"
 
-# Create a pre-existing settings.json with custom content
+# settings.json as written by the old setup.sh, plus a user's own entries
 cat > "$MERGE_HOME/.claude/settings.json" <<'EOF'
 {
   "mcpServers": {
     "my-custom-server": {
       "type": "stdio",
       "command": "my-tool"
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
     }
   },
   "enabledPlugins": {
@@ -241,20 +251,20 @@ cat > "$MERGE_HOME/.claude/settings.json" <<'EOF'
 EOF
 
 OUTPUT=$(HOME="$MERGE_HOME" PATH="$MERGE_HOME/bin:$PATH" bash "$SETUP_SCRIPT" claude 2>&1) || true
-
+CALLS=$(cat "$MERGE_HOME/claude-calls.log" 2>/dev/null)
 MERGED="$MERGE_HOME/.claude/settings.json"
 
-if [ -f "$MERGED" ]; then
-    assert_json_key "existing custom server preserved" "$MERGED" ".mcpServers.\"my-custom-server\""
-    assert_json_key "serena was merged in" "$MERGED" ".mcpServers.serena"
-    assert_json_key "enabledPlugins preserved" "$MERGED" ".enabledPlugins"
+assert_contains "already configured serena is skipped" "$OUTPUT" "serena already configured"
+SERENA_ADDS=$(grep -c "add-json --scope user serena" "$MERGE_HOME/claude-calls.log" 2>/dev/null || true)
+assert_eq "serena is not re-added" "0" "$SERENA_ADDS"
+assert_contains "figma is registered with claude" "$CALLS" "mcp add-json --scope user figma"
 
-    assert_file_exists "backup was created" "$MERGE_HOME/.claude/settings.json.backup"
-else
-    TOTAL=$((TOTAL + 1))
-    echo -e "  ${RED}✗${NC} merge test: settings.json missing after setup"
-    FAILED=$((FAILED + 1))
-fi
+FIGMA_LEFT=$(jq -r '.mcpServers | has("figma")' "$MERGED")
+assert_eq "stale figma removed from settings.json" "false" "$FIGMA_LEFT"
+assert_json_key "user's own server preserved" "$MERGED" ".mcpServers.\"my-custom-server\""
+assert_json_key "enabledPlugins preserved" "$MERGED" ".enabledPlugins"
+assert_contains "leftover ignored MCPs are reported" "$OUTPUT" "my-custom-server"
+assert_file_exists "backup was created" "$MERGE_HOME/.claude/settings.json.backup"
 
 # ----------------------------------------------------------
 echo ""
@@ -283,15 +293,14 @@ echo -e "${YELLOW}9. Interactive selector dry-run${NC}"
 
 DEFAULT_HOME="$TEST_DIR/default_home"
 mkdir -p "$DEFAULT_HOME/.claude"
-create_stub_bin "$DEFAULT_HOME/bin" "claude"
+create_claude_stub "$DEFAULT_HOME/bin"
 create_stub_bin "$DEFAULT_HOME/bin" "uvx"
 
 OUTPUT=$(HOME="$DEFAULT_HOME" PATH="$DEFAULT_HOME/bin:$PATH" bash "$SETUP_SCRIPT" < /dev/null 2>&1) || true
 DEFAULT_EXIT=$?
 
 if [ "$DEFAULT_EXIT" -eq 0 ]; then
-    assert_file_exists "Non-interactive default settings.json was created" "$DEFAULT_HOME/.claude/settings.json"
-    assert_json_key "Non-interactive default installed serena" "$DEFAULT_HOME/.claude/settings.json" ".mcpServers.serena"
+    assert_contains "Non-interactive default installed serena" "$(cat "$DEFAULT_HOME/claude-calls.log" 2>/dev/null)" "mcp add-json --scope user serena"
 else
     TOTAL=$((TOTAL + 1))
     echo -e "  ${RED}✗${NC} setup.sh non-interactive default failed (exit code: $DEFAULT_EXIT)"
