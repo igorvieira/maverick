@@ -390,6 +390,32 @@ else
     FAILED=$((FAILED + 1))
 fi
 
+# Personal knowledge is linked (never copied) when an index exists
+KNOWLEDGE_DIR="$TEST_DIR/knowledge"
+mkdir -p "$KNOWLEDGE_DIR"
+printf '%s\n' '{"schema_version":1,"entries":[]}' > "$KNOWLEDGE_DIR/index.json"
+KNOWLEDGE_TARGET="$TEST_DIR/knowledge-repo"
+mkdir -p "$KNOWLEDGE_TARGET"
+MAVERICK_KNOWLEDGE="$KNOWLEDGE_DIR" bash "$SETUP_SCRIPT" project "$KNOWLEDGE_TARGET" >/dev/null 2>&1 || true
+TOTAL=$((TOTAL + 1))
+if [ -L "$KNOWLEDGE_TARGET/.claude/maverick/knowledge" ] && [ "$(readlink "$KNOWLEDGE_TARGET/.claude/maverick/knowledge")" = "$KNOWLEDGE_DIR" ]; then
+    echo -e "  ${GREEN}✓${NC} knowledge directory linked into project"
+    PASSED=$((PASSED + 1))
+else
+    echo -e "  ${RED}✗${NC} knowledge directory not linked"
+    FAILED=$((FAILED + 1))
+fi
+if [ ! -f "$SCRIPT_DIR/.knowledge/index.json" ]; then
+    TOTAL=$((TOTAL + 1))
+    if [ ! -e "$PROJECT_TARGET/.claude/maverick/knowledge" ]; then
+        echo -e "  ${GREEN}✓${NC} no knowledge link without an index"
+        PASSED=$((PASSED + 1))
+    else
+        echo -e "  ${RED}✗${NC} knowledge linked without an index"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
 # ----------------------------------------------------------
 echo ""
 echo -e "${YELLOW}12. Structured packs and multi-pack installation${NC}"

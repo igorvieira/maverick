@@ -291,6 +291,18 @@ install_project() {
         echo "Pack '$pack' installed: agents in $target/agents/, manifest in $target/maverick/packs/$pack.json"
     done
 
+    # Personal knowledge (optional, git-ignored in Maverick): linked, never copied.
+    local knowledge_dir="${MAVERICK_KNOWLEDGE:-$SCRIPT_DIR/.knowledge}"
+    if [ -f "$knowledge_dir/index.json" ]; then
+        if [ -e "$target/maverick/knowledge" ] && [ ! -L "$target/maverick/knowledge" ]; then
+            echo "Existing knowledge directory preserved: $target/maverick/knowledge"
+        else
+            ln -sfn "$knowledge_dir" "$target/maverick/knowledge"
+            echo "Knowledge linked: $target/maverick/knowledge -> $knowledge_dir"
+            echo ">> If .claude/ is committed in this repo, ignore .claude/maverick/knowledge"
+        fi
+    fi
+
     if [ ! -f "$target/maverick/project.md" ]; then
         cp "$SCRIPT_DIR/claude/templates/maverick-project.md" "$target/maverick/project.md"
         echo "Adapter template installed: $target/maverick/project.md"

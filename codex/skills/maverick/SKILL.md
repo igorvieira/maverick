@@ -57,6 +57,10 @@ using `always` or any intersection with the extensible `classification.json` cap
 Do not classify tasks into a closed frontend/backend enum or select by agent name.
 Keep each reviewer's semantics in its prompt and scope reviewer IDs by pack.
 
+If `.claude/maverick/knowledge/index.json` exists, load the entries whose `capabilities`
+intersect the classification and pass them to the implementer and reviewers as additional
+checks. The project adapter wins on conflict. Skip silently when it is absent.
+
 Evaluate red-team gates and fix-loop policies from JSON. Structured fail or blocker/high
 findings block; use the manifest's legacy verdict mapping only for transitional prose.
 Missing or malformed required reviews remain unresolved. Record warning resolutions.

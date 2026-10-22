@@ -41,6 +41,13 @@ Add another pack the same way: `./setup.sh project /path/to/your/repo --pack typ
 
 `./setup.sh` with no arguments opens a small menu. For Codex, also copy `codex/AGENTS.md` into the consuming repo if you want the project template. The experimental Rust binary is optional and is not part of this install; see [Experimental Rust Runtime](#experimental-rust-runtime).
 
+## Personal knowledge (optional)
+
+Keep your own playbooks in `.knowledge/` at the root of this checkout (git-ignored) with an
+`index.json` that maps each file to capabilities like `payments` or `pagination`. Project
+installs link it, and the planner feeds matching entries to the implementer and reviewers.
+Format and options: [docs/knowledge.md](docs/knowledge.md).
+
 ## The Three Layers
 
 Maverick is **project-agnostic and language-agnostic** by construction. It separates:

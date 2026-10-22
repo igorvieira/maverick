@@ -326,6 +326,16 @@ instructions and the actual diff. Capabilities may span multiple concerns and pa
 there is no FRONTEND/BACKEND/FULLSTACK discriminator. Reclassify if implementation
 reveals additional affected surfaces, then recompute the panel from the manifest.
 
+### Step 1.3 - Load Personal Knowledge (optional)
+
+If `.claude/maverick/knowledge/index.json` exists, select the entries whose `capabilities`
+intersect the classification and read their files (see `docs/knowledge.md` in Maverick).
+List the selected entry IDs in the plan. Pass them to the implementer as guidance and to
+each selected reviewer as additional checks. Knowledge never overrides the project adapter,
+the approved plan or a reviewer's own prompt; on conflict, the adapter wins and the
+conflict is reported. Without the file, skip this step silently. Recompute the selection
+when the classification changes.
+
 ---
 
 ## Phase 2: Planning
@@ -457,7 +467,7 @@ do not invent a language-specific command.
 **Step 4.1 - Implement with the manifest slot**
 
 Invoke `agents.implementer` with the approved plan, capabilities, answered questions,
-adapter, and documentation. Layout, migrations/codegen, error handling, testing, and
+adapter, documentation, and any knowledge entries selected in Step 1.3. Layout, migrations/codegen, error handling, testing, and
 language conventions come from those inputs and the prompt.
 
 **Step 4.2 - Verify Build**
@@ -470,7 +480,7 @@ failing configured checks must be fixed before review.
 Route from the final capability set using the Language Packs protocol above. The
 existing Markdown workflow may dispatch its selected panel in parallel, preserving
 manifest order in reports; this does not add execution to the Rust runtime. Give each
-reviewer the diff, adapter, and its own prompt. The runtime has no language-specific
+reviewer the diff, adapter, its own prompt, and the selected knowledge entries. The runtime has no language-specific
 reviewer names or semantic knowledge.
 
 **Step 4.4 - Fix Loop**
