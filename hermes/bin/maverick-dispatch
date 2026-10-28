@@ -7,7 +7,7 @@
   maverick-dispatch list
 
 <message> may start with "[executor]" and/or "<repo>:" (only when <repo> is in the registry):
-  "[codex] api: fix the login timeout"   "fix the login timeout"   "ENG-123"
+  "[codex] api: fix the login timeout"   "fix the login timeout"   "TICKET-123"
 
 Registry: $MAVERICK_DISPATCH_CONFIG or ~/.config/maverick/dispatch.json (see dispatch.json.example).
 The last stdout line is always one JSON object for the caller (Hermes) to read.
