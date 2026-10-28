@@ -130,6 +130,13 @@ assert_file_exists "go pack manifest exists" "$SCRIPT_DIR/claude/agents/go/pack.
 assert_file_exists "go pack json manifest exists" "$SCRIPT_DIR/claude/agents/go/pack.json"
 assert_file_exists "typescript pack json manifest exists" "$SCRIPT_DIR/claude/agents/typescript/pack.json"
 assert_file_exists "go pack implementer agent exists" "$SCRIPT_DIR/claude/agents/go/go-implementer.md"
+for pack in rust python rails elixir; do
+    assert_file_exists "$pack pack json manifest exists" "$SCRIPT_DIR/claude/agents/$pack/pack.json"
+done
+for principle in README domain application-flow adapters eventing architecture red-team; do
+    assert_file_exists "shared principle exists: $principle" "$SCRIPT_DIR/claude/principles/$principle.md"
+done
+assert_file_exists "one-step installer exists" "$SCRIPT_DIR/install.sh"
 assert_file_exists "Codex AGENTS.md template exists" "$SCRIPT_DIR/codex/AGENTS.md"
 assert_file_exists "Codex config example exists" "$SCRIPT_DIR/codex/config/config.toml.example"
 assert_file_exists "Codex Maverick skill exists" "$SCRIPT_DIR/codex/skills/maverick/SKILL.md"
@@ -140,7 +147,7 @@ echo ""
 echo -e "${YELLOW}3. JSON validity${NC}"
 
 for f in "$SCRIPT_DIR/claude/mcp-servers/global.json" "$SCRIPT_DIR/claude/mcp-servers/project.json" \
-         "$SCRIPT_DIR/claude/agents/go/pack.json" "$SCRIPT_DIR/claude/agents/typescript/pack.json"; do
+         "$SCRIPT_DIR"/claude/agents/*/pack.json; do
     fname=${f#"$SCRIPT_DIR"/}
     TOTAL=$((TOTAL + 1))
     if jq empty "$f" 2>/dev/null; then
@@ -445,6 +452,149 @@ if bash "$SETUP_SCRIPT" project "$MULTI_TARGET" --pack ../go >/dev/null 2>&1; th
 else
     assert_eq "pack traversal rejected" "rejected" "rejected"
 fi
+for principle in domain application-flow adapters eventing architecture red-team; do
+    assert_file_exists "principle installed: $principle" "$MULTI_TARGET/.claude/maverick/principles/$principle.md"
+done
+
+ALL_TARGET="$TEST_DIR/all-packs-repo"
+mkdir -p "$ALL_TARGET"
+ALL_ARGS=()
+for manifest in "$SCRIPT_DIR"/claude/agents/*/pack.json; do
+    ALL_ARGS+=(--pack "$(jq -r '.id' "$manifest")")
+done
+if bash "$SETUP_SCRIPT" project "$ALL_TARGET" "${ALL_ARGS[@]}" >/dev/null 2>&1; then
+    assert_eq "every pack installs together" "0" "0"
+else
+    assert_eq "every pack installs together" "0" "1"
+fi
+for manifest in "$ALL_TARGET"/.claude/maverick/packs/*.json; do
+    pack=$(basename "$manifest" .json)
+    MISSING=0
+    while IFS= read -r agent; do
+        [ -f "$ALL_TARGET/.claude/agents/$agent.md" ] || MISSING=$((MISSING + 1))
+    done < <(jq -r '[.agents.planner, .agents.implementer, .agents.red_team, .reviewers[].agent] | .[] | select(. != null)' "$manifest")
+    assert_eq "$pack: every referenced agent installed" "0" "$MISSING"
+done
+
+DETECT_TARGET="$TEST_DIR/detect-repo"
+mkdir -p "$DETECT_TARGET/config"
+touch "$DETECT_TARGET/Gemfile" "$DETECT_TARGET/config/application.rb" "$DETECT_TARGET/mix.exs"
+OUTPUT=$(cd "$DETECT_TARGET" && bash "$SETUP_SCRIPT" project 2>&1) || true
+assert_contains "packs detected from repo files" "$OUTPUT" "Detected packs: elixir rails"
+assert_file_exists "detected rails pack installed" "$DETECT_TARGET/.claude/maverick/packs/rails.json"
+assert_file_exists "detected elixir pack installed" "$DETECT_TARGET/.claude/maverick/packs/elixir.json"
+assert_eq "undetected go pack not installed" "false" "$(test -f "$DETECT_TARGET/.claude/maverick/packs/go.json" && echo true || echo false)"
+
+EMPTY_TARGET="$TEST_DIR/empty-repo"
+mkdir -p "$EMPTY_TARGET"
+OUTPUT=$(bash "$SETUP_SCRIPT" project "$EMPTY_TARGET" 2>&1) || true
+assert_contains "no pack detected message" "$OUTPUT" "No language pack detected"
+assert_eq "no principles without packs" "false" "$(test -d "$EMPTY_TARGET/.claude/maverick/principles" && echo true || echo false)"
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}12b. One-step installer${NC}"
+
+if bash -n "$SCRIPT_DIR/install.sh"; then
+    assert_eq "install.sh syntax is valid" "0" "0"
+else
+    assert_eq "install.sh syntax is valid" "0" "1"
+fi
+SRC_REPO="$TEST_DIR/src-repo"
+git init --quiet -b main "$SRC_REPO"
+cp -R "$SCRIPT_DIR/setup.sh" "$SCRIPT_DIR/claude" "$SRC_REPO/"
+git -C "$SRC_REPO" add -A
+git -C "$SRC_REPO" -c user.name=t -c user.email=t@example.com commit --quiet -m init
+INSTALL_HOME="$TEST_DIR/install_home"
+mkdir -p "$INSTALL_HOME"
+run_installer() {
+    env -i HOME="$INSTALL_HOME" PATH=/usr/bin:/bin MAVERICK_REPO="file://$SRC_REPO" \
+        bash "$SCRIPT_DIR/install.sh" 2>&1
+}
+OUTPUT=$(run_installer) || true
+assert_file_exists "installer clones into ~/.local/share/maverick" "$INSTALL_HOME/.local/share/maverick/setup.sh"
+assert_file_exists "installer adds maverick-setup command" "$INSTALL_HOME/.local/bin/maverick-setup"
+assert_contains "installer skips missing CLIs" "$OUTPUT" "Claude Code not found; skipping"
+OUTPUT=$(run_installer) || true
+assert_contains "installer re-run updates in place" "$OUTPUT" "Updating Maverick"
+WRAP_TARGET="$TEST_DIR/wrap-repo"
+mkdir -p "$WRAP_TARGET"
+touch "$WRAP_TARGET/Cargo.toml"
+OUTPUT=$(cd "$WRAP_TARGET" && "$INSTALL_HOME/.local/bin/maverick-setup" project 2>&1) || true
+assert_file_exists "maverick-setup installs detected pack" "$WRAP_TARGET/.claude/maverick/packs/rust.json"
+
+# ----------------------------------------------------------
+echo ""
+echo -e "${YELLOW}13. Hermes setup and unattended dispatch${NC}"
+
+HERMES_HOME="$TEST_DIR/hermes_home"
+create_stub_bin "$HERMES_HOME/bin" "hermes"
+mkdir -p "$HERMES_HOME/.config/maverick"
+echo '{"keep":"me"}' > "$HERMES_HOME/.config/maverick/dispatch.json"
+
+if OUTPUT=$(HOME="$HERMES_HOME" PATH="$HERMES_HOME/bin:$PATH" bash "$SETUP_SCRIPT" hermes 2>&1); then
+    assert_file_exists "Hermes skill installed" "$HERMES_HOME/.hermes/skills/autonomous-ai-agents/maverick-dispatch/SKILL.md"
+    assert_file_exists "maverick-dispatch installed" "$HERMES_HOME/.local/bin/maverick-dispatch"
+    assert_file_exists "maverick-report installed" "$HERMES_HOME/.local/bin/maverick-report"
+    assert_eq "existing dispatch.json preserved" '{"keep":"me"}' "$(cat "$HERMES_HOME/.config/maverick/dispatch.json")"
+    assert_contains "channel prompt snippet printed" "$OUTPUT" "channel_prompts"
+else
+    assert_eq "setup.sh hermes succeeds" "0" "1"
+fi
+
+assert_json_key "dispatch.json.example is valid with grok disabled" "$SCRIPT_DIR/hermes/dispatch.json.example" '.executors.grok.enabled == false'
+
+REPORT_OUT=$(env -u MAVERICK_DISCORD_WEBHOOK MAVERICK_SECRETS=/nonexistent "$SCRIPT_DIR/hermes/bin/maverick-report" PLAN "hello" 2>&1; echo "exit=$?")
+assert_contains "maverick-report without webhook is a silent no-op" "$REPORT_OUT" "exit=0"
+
+# Stub executor: Phase A writes plan.md, Phase B writes result.json (or revises the plan on "refaz").
+DISPATCH_DIR="$TEST_DIR/dispatch"
+STUB="$DISPATCH_DIR/stub-exec"
+mkdir -p "$DISPATCH_DIR/repo"
+cat > "$STUB" <<'EOF'
+#!/bin/sh
+case "$1" in
+  plan) printf '## Plan\n%s\n' "$2" > "$MAVERICK_STATE_DIR/plan.md"; echo "MAVERICK_PLAN_READY" ;;
+  resume)
+    case "$2" in
+      *refaz*) sleep 1; printf '## Plan v2\n' > "$MAVERICK_STATE_DIR/plan.md" ;;
+      *) printf '{"status":"completed","pr":"https://example/pr/1","branch":"%s","summary":"done"}\n' \
+           "$(git rev-parse --abbrev-ref HEAD)" > "$MAVERICK_STATE_DIR/result.json" ;;
+    esac ;;
+esac
+EOF
+chmod +x "$STUB"
+git -C "$DISPATCH_DIR/repo" init -q -b main
+git -C "$DISPATCH_DIR/repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+cat > "$DISPATCH_DIR/dispatch.json" <<EOF
+{
+  "default_repo": "demo", "default_executor": "stub",
+  "state_root": "$DISPATCH_DIR/state", "worktree_root": "$DISPATCH_DIR/wt",
+  "repos": {"demo": {"path": "$DISPATCH_DIR/repo", "base": "main"}},
+  "executors": {
+    "stub": {"enabled": true, "session": "preassign",
+             "plan_prompt": "/maverick --unattended=plan {task_args}", "resume_prompt": "{reply}",
+             "plan": ["$STUB", "plan", "{prompt}"], "resume": ["$STUB", "resume", "{prompt}"]},
+    "grok": {"enabled": false}
+  }
+}
+EOF
+DISPATCH="$SCRIPT_DIR/hermes/bin/maverick-dispatch"
+export MAVERICK_DISPATCH_CONFIG="$DISPATCH_DIR/dispatch.json" MAVERICK_SECRETS=/nonexistent
+PLAN_OUT=$(env -u MAVERICK_DISCORD_WEBHOOK "$DISPATCH" plan --thread T1 '[grok] demo: fix "login" bug' | tail -1)
+assert_json_key "plan dispatch reports plan_ready" <(echo "$PLAN_OUT") '.status == "plan_ready"'
+assert_json_key "disabled executor falls back without asking" <(echo "$PLAN_OUT") '.note == "grok disabled, using stub"'
+assert_contains "task passed verbatim as --local" "$(cat "$(echo "$PLAN_OUT" | jq -r .plan)")" 'local "fix \\"login\\" bug"'
+assert_eq "worktree created on maverick/ branch" "true" \
+    "$(git -C "$DISPATCH_DIR/repo" branch --list 'maverick/*' | grep -q fix-login-bug && echo true || echo false)"
+
+REDO_OUT=$(env -u MAVERICK_DISCORD_WEBHOOK "$DISPATCH" execute --thread T1 'refaz com X' | tail -1)
+assert_json_key "rejecting reply returns a revised plan" <(echo "$REDO_OUT") '.status == "plan_ready"'
+EXEC_OUT=$(env -u MAVERICK_DISCORD_WEBHOOK "$DISPATCH" execute --thread T1 'ok' | tail -1)
+assert_json_key "execute dispatch reports completed with PR" <(echo "$EXEC_OUT") '.status == "completed" and .pr != null'
+NONE_OUT=$(env -u MAVERICK_DISCORD_WEBHOOK "$DISPATCH" execute --thread T1 'ok' | tail -1)
+assert_json_key "no second execute once the run finished" <(echo "$NONE_OUT") '.status == "error"'
+unset MAVERICK_DISPATCH_CONFIG MAVERICK_SECRETS
 
 # ============================================================
 echo ""

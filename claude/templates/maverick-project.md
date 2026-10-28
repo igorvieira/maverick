@@ -16,7 +16,7 @@ Rules for this file:
 ## Stack & Packs
 
 <!-- Agent packs installed in .claude/agents/ that Maverick should use -->
-packs: none            <!-- ordered list, e.g., go, typescript -->
+packs: none            <!-- ordered list: go, typescript, rust, python, rails, elixir -->
 frontend: none         <!-- e.g., react-nextjs | vue | none -->
 
 ## Structured Companion (optional)
@@ -61,6 +61,20 @@ typecheck: <e.g., npx tsc --noEmit | n/a>
 
 - <where commands/queries/handlers/components live, e.g., "commands in internal/commands/, queries in internal/queries/ (CQRS)">
 - <API contract style, e.g., "gRPC between services, GraphQL at the gateway">
+
+## Accepted Variants (read by every reviewer)
+
+Shared principles in `.claude/maverick/principles/` describe the target design. List the
+deviations this codebase deliberately accepts so reviewers report them as `low`/`info`
+instead of blocking every PR. Each line: the rule, the accepted variant, and its scope.
+
+- <e.g., "domain purity: ORM entities are used directly inside commands (features/ layout)">
+- <e.g., "value objects: IDs are plain UUID strings in existing services; new code may wrap them">
+- <e.g., "eventing: events published from an after-commit hook; outbox only in services X, Y">
+
+Accepted risks (data-loss class rules stay blocking unless listed here with an owner):
+
+- <e.g., "publish failures are only logged in legacy service X — owner: team-a, ticket ABC-1">
 
 ## Migrations & Codegen
 

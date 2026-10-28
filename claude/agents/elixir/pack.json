@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "id": "elixir",
+  "display_name": "Elixir",
+  "detection": {
+    "files": [
+      "mix.exs"
+    ],
+    "any_files": []
+  },
+  "commands": {
+    "format": "mix format",
+    "build": "mix compile --warnings-as-errors",
+    "test": "mix test"
+  },
+  "agents": {
+    "planner": "elixir-task-scope-planner",
+    "implementer": "elixir-implementer",
+    "red_team": "elixir-adversarial-architect"
+  },
+  "reviewers": [
+    {
+      "id": "idiom",
+      "agent": "elixir-idiom-reviewer",
+      "always": true,
+      "capabilities": [],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "domain",
+      "agent": "elixir-domain-reviewer",
+      "always": false,
+      "capabilities": [
+        "domain"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "application_flow",
+      "agent": "elixir-application-flow-reviewer",
+      "always": false,
+      "capabilities": [
+        "application_flow"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "adapter",
+      "agent": "elixir-adapter-reviewer",
+      "always": false,
+      "capabilities": [
+        "adapters",
+        "api_contract",
+        "database"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "eventing",
+      "agent": "elixir-eventing-reviewer",
+      "always": false,
+      "capabilities": [
+        "eventing"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "architecture",
+      "agent": "elixir-arch-reviewer",
+      "always": false,
+      "capabilities": [
+        "architecture",
+        "transaction_boundaries",
+        "cross_service_consistency",
+        "concurrency"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    }
+  ],
+  "red_team": {
+    "always": false,
+    "capabilities": [
+      "domain",
+      "eventing",
+      "aggregate_design",
+      "transaction_boundaries",
+      "cross_service_consistency",
+      "eventing_strategy"
+    ],
+    "blocking": {
+      "statuses": [
+        "fail"
+      ],
+      "severities": [
+        "blocker",
+        "high"
+      ]
+    },
+    "legacy_verdicts": {
+      "Architecture holds under scrutiny": "pass",
+      "Architecture holds with identified risks": "warn",
+      "Architecture has critical flaws": "fail"
+    }
+  },
+  "review_policy": {
+    "max_fix_rounds": 3,
+    "rerun_blocked_only": true,
+    "resolve_warnings": true
+  }
+}

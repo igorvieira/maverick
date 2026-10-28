@@ -14,20 +14,31 @@ CODEX_DIR="$HOME/.codex"
 CODEX_SKILLS_DIR="$CODEX_DIR/skills"
 CODEX_CONFIG="$CODEX_DIR/config.toml"
 
+HERMES_SKILLS_DIR="$HOME/.hermes/skills/autonomous-ai-agents"
+MAVERICK_CONFIG_DIR="$HOME/.config/maverick"
+LOCAL_BIN="$HOME/.local/bin"
+
 print_usage() {
     cat <<EOF
-Usage: ./setup.sh [claude|codex|all]
-       ./setup.sh project /path/to/repo [--pack go]
+Usage: ./setup.sh [claude|codex|all|hermes]
+       ./setup.sh project /path/to/repo [--pack <id>]...
+
+Packs: go, typescript (Node.js backend + frontend), rust, python, rails, elixir.
+Without --pack, packs are detected from the repo's files (go.mod, package.json,
+Cargo.toml, pyproject.toml, Gemfile + config/application.rb, mix.exs).
 
 Targets:
   claude   Install Claude Code MCP configuration
   codex    Install Codex Maverick skill/templates
   all      Install both Claude Code and Codex assets
+  hermes   Install the Hermes maverick-dispatch skill, maverick-dispatch/maverick-report
+           into ~/.local/bin and a dispatch.json registry (never overwritten)
   project  Install the Maverick workflow into a repository's .claude/:
              - skills/maverick + commands (thin /maverick entry point, maverick-single,
                review-resolver, senior-*)
              - each --pack <name>: agents copied flat into .claude/agents/ and the pack
                JSON manifest into .claude/maverick/packs/<name>.json
+             - shared backend principles into .claude/maverick/principles/
              - the project adapter template into .claude/maverick/project.md
                (never overwrites an existing adapter)
 
@@ -219,9 +230,91 @@ install_codex() {
     echo "Codex setup complete."
 }
 
+install_hermes() {
+    echo ""
+    echo "Hermes Setup"
+    echo "============"
+
+    if ! command -v hermes &> /dev/null; then
+        echo "Hermes Agent not found. Install it first: https://github.com/NousResearch/hermes-agent" >&2
+        exit 1
+    fi
+
+    echo "Hermes found"
+
+    mkdir -p "$HERMES_SKILLS_DIR" "$LOCAL_BIN" "$MAVERICK_CONFIG_DIR"
+
+    rm -rf "$HERMES_SKILLS_DIR/maverick-dispatch"
+    cp -R "$SCRIPT_DIR/hermes/skills/maverick-dispatch" "$HERMES_SKILLS_DIR/maverick-dispatch"
+    echo "Hermes skill installed: $HERMES_SKILLS_DIR/maverick-dispatch"
+
+    local tool
+    for tool in maverick-dispatch maverick-report; do
+        install -m 755 "$SCRIPT_DIR/hermes/bin/$tool" "$LOCAL_BIN/$tool"
+        echo "Installed: $LOCAL_BIN/$tool"
+    done
+
+    if [ ! -f "$MAVERICK_CONFIG_DIR/dispatch.json" ]; then
+        cp "$SCRIPT_DIR/hermes/dispatch.json.example" "$MAVERICK_CONFIG_DIR/dispatch.json"
+        echo "Registry template installed: $MAVERICK_CONFIG_DIR/dispatch.json"
+        echo ">> Add your repos there (name -> path, base branch)."
+    else
+        echo "Existing registry preserved: $MAVERICK_CONFIG_DIR/dispatch.json"
+    fi
+
+    echo ""
+    echo "Hermes config is not edited automatically. Add to ~/.hermes/config.yaml:"
+    echo ""
+    echo "  discord:"
+    echo "    free_response_channels: [\"<CHANNEL_ID>\"]"
+    echo "    free_response_auto_thread: true"
+    echo "    allowed_channels: [\"<CHANNEL_ID>\"]"
+    echo "    allow_mentions: { replied_user: false }"
+    echo "    channel_prompts:"
+    echo "      \"<CHANNEL_ID>\": |"
+    sed 's/^/        /' "$SCRIPT_DIR/hermes/channel-prompt.md"
+    echo ""
+    echo "Put the channel webhook in $MAVERICK_CONFIG_DIR/secrets.env (chmod 600):"
+    echo "  MAVERICK_DISCORD_WEBHOOK=https://discord.com/api/webhooks/..."
+    echo ""
+    echo "Hermes setup complete."
+}
+
+# Prints the IDs of packs whose detection rules match the project (needs jq).
+detect_packs() {
+    local project_path="$1" manifest found=()
+    if ! command -v jq &> /dev/null; then
+        echo "jq not found: pass --pack explicitly to install language packs." >&2
+        return
+    fi
+    for manifest in "$SCRIPT_DIR"/claude/agents/*/pack.json; do
+        local all_ok=true any_ok=true file
+        while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            [ -f "$project_path/$file" ] || all_ok=false
+        done < <(jq -r '.detection.files[]?' "$manifest")
+        if [ "$(jq '.detection.any_files | length' "$manifest")" -gt 0 ]; then
+            any_ok=false
+            while IFS= read -r file; do
+                [ -f "$project_path/$file" ] && any_ok=true
+            done < <(jq -r '.detection.any_files[]' "$manifest")
+        fi
+        if [ "$(jq '(.detection.files | length) + (.detection.any_files | length)' "$manifest")" -eq 0 ]; then
+            continue
+        fi
+        if $all_ok && $any_ok; then
+            found+=("$(jq -r '.id' "$manifest")")
+        fi
+    done
+    echo "${found[*]}"
+}
+
 install_project() {
-    local project_path="$1"
-    shift || true
+    local project_path="."
+    if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
+        project_path="$1"
+        shift
+    fi
 
     echo ""
     echo "Maverick Project Install"
@@ -229,7 +322,7 @@ install_project() {
 
     if [ -z "$project_path" ] || [ ! -d "$project_path" ]; then
         echo "Project path not found: '$project_path'" >&2
-        echo "Usage: ./setup.sh project /path/to/repo [--pack go]" >&2
+        echo "Usage: ./setup.sh project /path/to/repo [--pack <id>]..." >&2
         exit 1
     fi
 
@@ -250,6 +343,18 @@ install_project() {
                 ;;
         esac
     done
+
+    if [ ${#packs[@]} -eq 0 ]; then
+        local detected
+        detected=$(detect_packs "$project_path")
+        if [ -n "$detected" ]; then
+            # shellcheck disable=SC2206
+            packs=($detected)
+            echo "Detected packs: ${packs[*]} (pass --pack to choose explicitly)"
+        else
+            echo "No language pack detected; installing the workflow only."
+        fi
+    fi
 
     local target="$project_path/.claude"
     mkdir -p "$target/commands" "$target/skills/maverick" "$target/agents" "$target/maverick/packs"
@@ -291,6 +396,12 @@ install_project() {
         echo "Pack '$pack' installed: agents in $target/agents/, manifest in $target/maverick/packs/$pack.json"
     done
 
+    if [ ${#packs[@]} -gt 0 ]; then
+        mkdir -p "$target/maverick/principles"
+        cp "$SCRIPT_DIR"/claude/principles/*.md "$target/maverick/principles/"
+        echo "Shared principles installed: $target/maverick/principles/"
+    fi
+
     # Personal knowledge (optional, git-ignored in Maverick): linked, never copied.
     local knowledge_dir="${MAVERICK_KNOWLEDGE:-$SCRIPT_DIR/.knowledge}"
     if [ -f "$knowledge_dir/index.json" ]; then
@@ -328,6 +439,9 @@ case "$TARGET" in
         ;;
     codex)
         install_codex
+        ;;
+    hermes)
+        install_hermes
         ;;
     all)
         install_claude
