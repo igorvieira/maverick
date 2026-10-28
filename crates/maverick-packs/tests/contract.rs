@@ -8,6 +8,8 @@ use std::{
 };
 use tempfile::tempdir;
 
+const PACKS: [&str; 6] = ["go", "typescript", "rust", "python", "rails", "elixir"];
+
 fn source(id: &str) -> (PathBuf, PathBuf) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../claude/agents")
@@ -33,11 +35,15 @@ fn value() -> Value {
 }
 
 #[test]
-fn both_packs_satisfy_the_same_loading_detection_and_routing_contract() {
+fn every_pack_satisfies_the_same_loading_detection_and_routing_contract() {
     // One parameterized contract: no language-dependent execution path.
     for (id, required, capability, conditional, count) in [
         ("go", "idiom", "domain", "domain", 6),
-        ("typescript", "type_safety", "frontend", "frontend", 3),
+        ("typescript", "type_safety", "frontend", "frontend", 8),
+        ("rust", "idiom", "domain", "domain", 6),
+        ("python", "idiom", "domain", "domain", 6),
+        ("rails", "idiom", "domain", "domain", 6),
+        ("elixir", "idiom", "domain", "domain", 6),
     ] {
         let pack = pack(id);
         assert_eq!(pack.id, id);
@@ -53,7 +59,9 @@ fn both_packs_satisfy_the_same_loading_detection_and_routing_contract() {
             .iter()
             .chain(pack.detection.any_files.iter().take(1))
         {
-            fs::write(project.path().join(file), "").unwrap();
+            let path = project.path().join(file);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "").unwrap();
         }
         assert!(detect_pack(&pack, project.path()).unwrap());
         assert!(pack.commands.test.is_some());
@@ -146,19 +154,19 @@ fn routing_preserves_order_and_never_duplicates_multi_capability_matches() {
     let ts = pack("typescript");
     assert_eq!(
         selected(&ts, &["api_contract", "frontend", "accessibility"]),
-        ["type_safety", "frontend", "contracts"]
+        ["type_safety", "frontend", "contracts", "adapter"]
     );
     let mut reordered = ts.clone();
     reordered.reviewers.reverse();
     assert_eq!(
         selected(&reordered, &["frontend", "api_contract"]),
-        ["contracts", "frontend", "type_safety"]
+        ["adapter", "contracts", "frontend", "type_safety"]
     );
 }
 
 #[test]
 fn unrelated_manifest_ids_agents_and_novel_capabilities_route_identically() {
-    for id in ["go", "typescript"] {
+    for id in PACKS {
         let mut manifest = pack(id);
         manifest.id = "independent-example".into();
         manifest.agents.planner = "custom-planner".into();
@@ -353,9 +361,15 @@ fn go_gates_and_legacy_policies_are_preserved_in_the_manifest() {
         go.red_team.as_ref().unwrap().legacy_verdicts["Architecture has critical flaws"],
         ReviewStatus::Fail
     );
-    assert!(!pack("typescript")
-        .requires_red_team(&capabilities(&["domain", "eventing"]))
-        .unwrap());
+    for id in PACKS {
+        let pack = pack(id);
+        assert!(pack
+            .requires_red_team(&capabilities(&["eventing"]))
+            .unwrap());
+        assert!(!pack
+            .requires_red_team(&capabilities(&["frontend", "adapters"]))
+            .unwrap());
+    }
     let mut invalid = go.clone();
     invalid.agents.red_team = None;
     assert!(invalid.validate().is_err());
@@ -366,7 +380,7 @@ fn go_gates_and_legacy_policies_are_preserved_in_the_manifest() {
 
 #[test]
 fn aggregation_uses_structured_results_and_fails_closed_on_missing_reviews() {
-    for id in ["go", "typescript"] {
+    for id in PACKS {
         let pack = pack(id);
         let caps = capabilities(&[]);
         let required = &pack.reviewers[0].id;

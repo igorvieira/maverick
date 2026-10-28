@@ -6,40 +6,62 @@ My personal AI coding configuration with MCPs, skills, commands, agent packs, an
 
 <img width="702" height="300" alt="image-removebg-preview (1)" src="https://github.com/user-attachments/assets/f42be722-0cdb-4961-9a70-624bb87a0a4f" />
 
-## Install the harness
+## Install
 
-Three commands. That is the whole install.
+One command per machine, one per repo. No UI, no Rust toolchain needed.
 
 ```bash
-git clone https://github.com/igorvieira/maverick.git
-cd maverick
+# 1. Once per machine: clones into ~/.local/share/maverick, adds `maverick-setup` to ~/.local/bin,
+#    and configures Claude Code and/or Codex if they are installed.
+curl -fsSL https://raw.githubusercontent.com/igorvieira/maverick/main/install.sh | bash
 
-./setup.sh all                                      # once, on this machine
-./setup.sh project /path/to/your/repo --pack go     # once per repo
+# 2. Once per repo: packs are detected from the repo's files.
+cd /path/to/your/repo && maverick-setup project
 ```
 
-`all` installs Claude Code MCPs and the Codex skill. Use `./setup.sh claude` or `./setup.sh codex` if you only want one. The matching CLI (`claude` and/or `codex`) must already be on your PATH.
-
-The project step copies the workflow into that repo's `.claude/`: skill, commands, the selected language pack, and `.claude/maverick/project.md` if it is missing. It never overwrites an existing adapter.
-
-Then fill **only** `.claude/maverick/project.md` with this repo's facts (build/test commands, layout, ticket prefix). No secrets. Open the repo in Claude Code or Codex and run:
+Re-run step 1 at any time to update. Then fill **only** `.claude/maverick/project.md` with
+this repo's facts (commands, layout, accepted variants, ticket prefix). No secrets. Open
+the repo in Claude Code or Codex and run:
 
 ```text
 /maverick TICKET-123
 /maverick --local "Add dark mode toggle"
 ```
 
-Add another pack the same way: `./setup.sh project /path/to/your/repo --pack typescript`.
-
 | You want | Command |
 |---|---|
-| Claude + Codex on this machine | `./setup.sh all` |
-| Only Claude Code | `./setup.sh claude` |
-| Only Codex | `./setup.sh codex` |
-| Harness inside a Go repo | `./setup.sh project <repo> --pack go` |
-| Go + TypeScript in the same repo | `./setup.sh project <repo> --pack go --pack typescript` |
+| Install or update Maverick on this machine | `curl -fsSL …/install.sh \| bash` |
+| Workflow + detected packs in the current repo | `maverick-setup project` |
+| Choose packs explicitly | `maverick-setup project . --pack typescript --pack rust` |
+| Configure a CLI installed later | `maverick-setup claude` or `maverick-setup codex` |
+| Install somewhere else / another branch | `MAVERICK_HOME=~/tools/maverick MAVERICK_REF=my-branch bash install.sh` |
 
-`./setup.sh` with no arguments opens a small menu. For Codex, also copy `codex/AGENTS.md` into the consuming repo if you want the project template. The experimental Rust binary is optional and is not part of this install; see [Experimental Rust Runtime](#experimental-rust-runtime).
+Requirements: `git` and `bash`. `jq` is used for Claude MCP setup and pack detection
+(without it, pass `--pack` explicitly). Working from a clone instead? `./setup.sh` accepts
+the same arguments as `maverick-setup`.
+
+### Discord via Hermes (optional)
+
+Send tasks from a Discord channel and get PRs back, with **one** interruption per task: the plan.
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) is the dispatcher; Claude Code, Codex
+or Grok do the work through `/maverick --unattended`.
+
+```bash
+./setup.sh hermes   # skill + maverick-dispatch/maverick-report + ~/.config/maverick/dispatch.json
+```
+
+```
+#maverick  "api: fix the login timeout"        → thread, worktree, plan (🔕 silent progress)
+           @you plan ready — answer once        → "ok" / "ok, 1: use X" / "redo"
+           (autonomous: implement → QA → PR)   → 🔕 silent phase reports via webhook
+           @you ✅ PR #42                       (or ⚠️ draft PR with the blocker — never a question)
+```
+
+Prefixes: `[codex]` / `[grok]` picks the executor, `<repo>:` picks a repo from `dispatch.json`.
+The setup prints the `~/.hermes/config.yaml` snippet; the bot token and the channel webhook stay in
+`~/.hermes/.env` and `~/.config/maverick/secrets.env`, never in this repo.
+
+For Codex, also copy `codex/AGENTS.md` into the consuming repo if you want the project template. The experimental Rust binary is optional and is not part of this install; see [Experimental Rust Runtime](#experimental-rust-runtime).
 
 ## Personal knowledge (optional)
 
@@ -56,6 +78,7 @@ Maverick is **project-agnostic and language-agnostic** by construction. It separ
 |---|---|---|
 | **Core workflow** | `claude/skills/maverick/SKILL.md` | phases, single approval checkpoint, parallel worktrees, QA gates, delivery, PR + review window |
 | **Language packs** | `claude/agents/<pack>/` | specialist agents for a language (planner, red team, implementer, reviewer panel) |
+| **Shared principles** | `claude/principles/` | language-neutral backend rules (domain, flow, adapters, eventing, architecture, red team) the packs apply |
 | **Project adapter** | `.claude/maverick/project.md` *in your repo* | YOUR repo's facts: build/test commands, layout, migrations, conventions, ticket prefix |
 
 Project-specific knowledge never lives in this repository — it lives in each consuming repo's
@@ -73,20 +96,89 @@ maverick/
 │   ├── skills/
 │   │   └── maverick/
 │   │       └── SKILL.md          # Core workflow (single source of truth)
-│   ├── agents/
-│   │   ├── typescript/           # Minimal TypeScript pack
-│   │   └── go/                   # Go language pack (DDD + Clean Architecture)
-│   │       ├── pack.json         # Authoritative structured manifest
-│   │       ├── pack.md           # Compatibility pointer only
-│   │       ├── go-task-scope-planner.md
-│   │       ├── go-adversarial-architect.md
-│   │       ├── go-implementer.md
-│   │       ├── go-domain-model-reviewer.md
-│   │       ├── go-application-flow-reviewer.md
-│   │       ├── go-adapter-reviewer.md
-│   │       ├── go-eventing-reviewer.md
-│   │       ├── go-idiom-reviewer.md
-│   │       └── go-arch-reviewer.md
+│   ├── principles/               # Shared, language-neutral backend rules
+│   │   ├── README.md             # Adapter overrides: accepted variants, diff-only review
+│   │   ├── domain.md
+│   │   ├── application-flow.md
+│   │   ├── adapters.md
+│   │   ├── eventing.md
+│   │   ├── architecture.md
+│   │   └── red-team.md
+│   ├── agents/                   # One directory per language pack
+│   │   ├── go/                   # Go: DDD + Clean Architecture, rules inline
+│   │   │   ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │   │   ├── pack.md                       # Compatibility pointer only
+│   │   │   ├── go-task-scope-planner.md
+│   │   │   ├── go-implementer.md
+│   │   │   ├── go-adversarial-architect.md
+│   │   │   ├── go-idiom-reviewer.md
+│   │   │   ├── go-domain-model-reviewer.md
+│   │   │   ├── go-application-flow-reviewer.md
+│   │   │   ├── go-adapter-reviewer.md
+│   │   │   ├── go-eventing-reviewer.md
+│   │   │   └── go-arch-reviewer.md
+│   │   ├── typescript/           # Node.js backend + frontend (TypeScript)
+│   │   │   ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │   │   ├── pack.md                       # Compatibility pointer only
+│   │   │   ├── typescript-task-scope-planner.md
+│   │   │   ├── typescript-implementer.md
+│   │   │   ├── typescript-adversarial-architect.md
+│   │   │   ├── typescript-type-safety-reviewer.md
+│   │   │   ├── typescript-frontend-reviewer.md
+│   │   │   ├── typescript-contract-reviewer.md
+│   │   │   ├── typescript-domain-reviewer.md
+│   │   │   ├── typescript-application-flow-reviewer.md
+│   │   │   ├── typescript-adapter-reviewer.md
+│   │   │   ├── typescript-eventing-reviewer.md
+│   │   │   └── typescript-arch-reviewer.md
+│   │   ├── rust/                 # Rust
+│   │   │   ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │   │   ├── pack.md                       # Compatibility pointer only
+│   │   │   ├── rust-task-scope-planner.md
+│   │   │   ├── rust-implementer.md
+│   │   │   ├── rust-adversarial-architect.md
+│   │   │   ├── rust-idiom-reviewer.md
+│   │   │   ├── rust-domain-reviewer.md
+│   │   │   ├── rust-application-flow-reviewer.md
+│   │   │   ├── rust-adapter-reviewer.md
+│   │   │   ├── rust-eventing-reviewer.md
+│   │   │   └── rust-arch-reviewer.md
+│   │   ├── python/               # Python
+│   │   │   ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │   │   ├── pack.md                       # Compatibility pointer only
+│   │   │   ├── python-task-scope-planner.md
+│   │   │   ├── python-implementer.md
+│   │   │   ├── python-adversarial-architect.md
+│   │   │   ├── python-idiom-reviewer.md
+│   │   │   ├── python-domain-reviewer.md
+│   │   │   ├── python-application-flow-reviewer.md
+│   │   │   ├── python-adapter-reviewer.md
+│   │   │   ├── python-eventing-reviewer.md
+│   │   │   └── python-arch-reviewer.md
+│   │   ├── rails/                # Ruby on Rails
+│   │   │   ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │   │   ├── pack.md                       # Compatibility pointer only
+│   │   │   ├── rails-task-scope-planner.md
+│   │   │   ├── rails-implementer.md
+│   │   │   ├── rails-adversarial-architect.md
+│   │   │   ├── rails-idiom-reviewer.md
+│   │   │   ├── rails-domain-reviewer.md
+│   │   │   ├── rails-application-flow-reviewer.md
+│   │   │   ├── rails-adapter-reviewer.md
+│   │   │   ├── rails-eventing-reviewer.md
+│   │   │   └── rails-arch-reviewer.md
+│   │   └── elixir/               # Elixir / Phoenix / OTP
+│   │       ├── pack.json                     # Manifest: detection, commands, reviewer routing
+│   │       ├── pack.md                       # Compatibility pointer only
+│   │       ├── elixir-task-scope-planner.md
+│   │       ├── elixir-implementer.md
+│   │       ├── elixir-adversarial-architect.md
+│   │       ├── elixir-idiom-reviewer.md
+│   │       ├── elixir-domain-reviewer.md
+│   │       ├── elixir-application-flow-reviewer.md
+│   │       ├── elixir-adapter-reviewer.md
+│   │       ├── elixir-eventing-reviewer.md
+│   │       └── elixir-arch-reviewer.md
 │   ├── commands/                 # Claude Code slash commands
 │   │   ├── maverick.md           # Thin /maverick entry point (delegates to the skill)
 │   │   ├── maverick-single.md    # Worktree unit of execution
@@ -102,6 +194,8 @@ maverick/
 │   ├── AGENTS.md
 │   ├── config/config.toml.example
 │   └── skills/maverick/SKILL.md
+├── hermes/                       # Hermes dispatcher: skill, maverick-dispatch, maverick-report
+├── install.sh                    # One-step machine installer (curl | bash)
 ├── setup.sh                      # Installer (global, codex, and per-project)
 └── test_setup.sh                 # Test suite for setup scripts
 ```
@@ -328,25 +422,54 @@ local tasks.
 8. REVIEW     → 10-min review window → /review-resolver hand-off or clear
 ```
 
-<img width="700" height="620" alt="image" src="https://github.com/user-attachments/assets/e2bc6fe7-ae6e-4900-a06d-d76f3ea386bc" />
+```mermaid
+flowchart LR
+    T[Ticket or --local task] --> A[Project adapter<br/>.claude/maverick/project.md]
+    A --> D{Packs selected<br/>adapter or detection}
+    D --> PL[Planner + optional red team]
+    PL -->|single approval| IM[Implementer]
+    IM --> R[Capability-routed reviewers]
+    R -->|blocked: fix loop, max 3| IM
+    R --> QA[QA + regression check] --> PR[Commit, PR, review window]
+    subgraph Packs
+      direction TB
+      GO[go] ~~~ TS[typescript] ~~~ RS[rust]
+      PY[python] ~~~ RB[rails] ~~~ EX[elixir]
+    end
+    D -.-> Packs
+    P[(Shared principles)] -.-> R
+```
 
 ## Language Packs
 
 Language packs implement a language-independent contract: detection, optional commands,
 planner/implementer slots, optional red-team gates, and ordered capability-based reviewers.
-**Go is the first implementation, not the runtime's internal model.** Its semantic
-DDD, Clean Architecture, eventing, and idiom guidance stays in its prompts. TypeScript
-proves the same protocol works with a different reviewer set and command set.
+No language is the runtime's internal model. The backend rules that started in the Go
+pack (transaction owned by the use case, events only after commit or via outbox,
+idempotent consumers, bounded retries vs dead-letter, timeouts, value objects, thin
+adapters) now live once in [`claude/principles/`](claude/principles/README.md). Each pack
+applies them and adds only its language's idioms, libraries, and failure modes. Go keeps
+its original inline prompts.
 
-The authoritative manifests are [Go](claude/agents/go/pack.json) and
-[TypeScript](claude/agents/typescript/pack.json). Markdown manifest files are compatibility
-pointers, not editable policy copies. Both workflow entry points read JSON. The Rust
+Every pack has the same slots and the same capability vocabulary, so routing is
+predictable across languages:
+
+| Pack | Detected by | Always | Conditional reviewers | Red team on |
+|---|---|---|---|---|
+| [Go](claude/agents/go/pack.json) | `go.mod` | idiom | domain, application_flow, adapter, eventing, architecture | domain, eventing, transaction/consistency |
+| [TypeScript](claude/agents/typescript/pack.json) (Node.js + UI) | `tsconfig.json` or `package.json` | type_safety | frontend, contracts, domain, application_flow, adapter, eventing, architecture | same |
+| [Rust](claude/agents/rust/pack.json) | `Cargo.toml` | idiom | domain, application_flow, adapter, eventing, architecture | same |
+| [Python](claude/agents/python/pack.json) | `pyproject.toml`, `requirements.txt` or `setup.py` | idiom | domain, application_flow, adapter, eventing, architecture | same |
+| [Rails](claude/agents/rails/pack.json) | `Gemfile` + `config/application.rb` | idiom | domain, application_flow, adapter, eventing, architecture | same |
+| [Elixir](claude/agents/elixir/pack.json) | `mix.exs` | idiom | domain, application_flow, adapter, eventing, architecture | same |
+
+Reviewers grade the diff, not pre-existing code. Deviations a codebase deliberately
+accepts (ORM inside commands, primitive IDs, after-commit hooks instead of an outbox) go
+in the adapter's **Accepted Variants** section and are reported as `low`/`info` instead
+of blocking every PR. Data-loss rules stay blocking for new code.
+
+Markdown manifest files are compatibility pointers, not editable policy copies. The Rust
 loader and router have no language-specific branches or hardcoded agent names.
-
-| Pack | Review coverage |
-|---|---|
-| Go | Mandatory idiom; conditional domain, application flow, adapters, eventing and architecture |
-| TypeScript | Mandatory type safety; conditional frontend/accessibility and API contracts/runtime validation |
 
 Capabilities are extensible validated snake_case strings, not a closed enum. Reviewers
 are selected once in manifest order by `always` or any capability intersection. Unknown
@@ -354,7 +477,7 @@ capabilities do not break routing. Structured fail or blocker/high findings bloc
 Go's legacy prose verdict mappings live only in its JSON manifest.
 
 ```bash
-./setup.sh project /path/to/your/repo --pack go --pack typescript
+maverick-setup project /path/to/your/repo --pack go --pack typescript
 
 cargo run -p maverick-cli -- pack --manifest claude/agents/go/pack.json \
   --capability domain --capability eventing
@@ -365,7 +488,7 @@ cargo run -p maverick-cli -- pack --manifest claude/agents/typescript/pack.json 
 # type_safety, frontend, contracts; no red team
 ```
 
-The same code path handles both packs. Pack inspection returns JSON and never runs
+The same code path handles every pack. Pack inspection returns JSON and never runs
 agents, shell commands, or lifecycle transitions. The existing Markdown workflow still
 performs execution and applies each manifest's fix policy.
 

@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "id": "rust",
+  "display_name": "Rust",
+  "detection": {
+    "files": [
+      "Cargo.toml"
+    ],
+    "any_files": []
+  },
+  "commands": {
+    "format": "cargo fmt --all",
+    "build": "cargo build --workspace",
+    "test": "cargo test --workspace",
+    "lint": "cargo clippy --workspace --all-targets -- -D warnings"
+  },
+  "agents": {
+    "planner": "rust-task-scope-planner",
+    "implementer": "rust-implementer",
+    "red_team": "rust-adversarial-architect"
+  },
+  "reviewers": [
+    {
+      "id": "idiom",
+      "agent": "rust-idiom-reviewer",
+      "always": true,
+      "capabilities": [],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "domain",
+      "agent": "rust-domain-reviewer",
+      "always": false,
+      "capabilities": [
+        "domain"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "application_flow",
+      "agent": "rust-application-flow-reviewer",
+      "always": false,
+      "capabilities": [
+        "application_flow"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "adapter",
+      "agent": "rust-adapter-reviewer",
+      "always": false,
+      "capabilities": [
+        "adapters",
+        "api_contract",
+        "database"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "eventing",
+      "agent": "rust-eventing-reviewer",
+      "always": false,
+      "capabilities": [
+        "eventing"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "architecture",
+      "agent": "rust-arch-reviewer",
+      "always": false,
+      "capabilities": [
+        "architecture",
+        "transaction_boundaries",
+        "cross_service_consistency",
+        "concurrency"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    }
+  ],
+  "red_team": {
+    "always": false,
+    "capabilities": [
+      "domain",
+      "eventing",
+      "aggregate_design",
+      "transaction_boundaries",
+      "cross_service_consistency",
+      "eventing_strategy"
+    ],
+    "blocking": {
+      "statuses": [
+        "fail"
+      ],
+      "severities": [
+        "blocker",
+        "high"
+      ]
+    },
+    "legacy_verdicts": {
+      "Architecture holds under scrutiny": "pass",
+      "Architecture holds with identified risks": "warn",
+      "Architecture has critical flaws": "fail"
+    }
+  },
+  "review_policy": {
+    "max_fix_rounds": 3,
+    "rerun_blocked_only": true,
+    "resolve_warnings": true
+  }
+}

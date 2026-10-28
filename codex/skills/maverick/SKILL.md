@@ -44,6 +44,23 @@ For multiple independent tickets or tasks:
 - Otherwise, execute sequentially.
 - Use worktrees only when multiple branches need to progress independently.
 
+### Unattended (`--unattended=plan|execute`)
+
+Headless dispatch via `codex exec` (Phase A) and `codex exec resume <id>` (Phase B). The user is
+interrupted exactly once, at the plan. Same contract as the Claude skill's *Unattended Mode*:
+
+- **plan**: already inside a fresh worktree. Read the adapter, plan, run a baseline build/test,
+  check `gh auth status`, and do an adversarial self-review. Only questions the code cannot
+  answer go to *Open Questions*, each with its default. Write `$MAVERICK_STATE_DIR/plan.md`
+  (plan + Pre-flight + Assumed + Open Questions), print `MAVERICK_PLAN_READY <path>`, and exit.
+- **execute**: the resume message (`Plan reply from the user: <<<…>>>`) is the final authorization. Apply the answers
+  and defaults, never ask again, then implement, verify, commit, push, and open the PR. A rejecting
+  reply means rewrite `plan.md` and print `MAVERICK_PLAN_READY` again.
+- **Reports**: `maverick-report <PHASE> "<line>"` per phase when the command exists; never a question.
+- **Blockers**: draft PR with a `## Blocker` section, never a question.
+- **Result**: write `$MAVERICK_STATE_DIR/result.json` and print it last:
+  `{"status":"completed|blocked","pr":…,"branch":…,"summary":…}`.
+
 ## Declarative Language Packs
 
 When packs are installed, read `.claude/maverick/packs/<id>.json` and the project
@@ -51,6 +68,9 @@ adapter. JSON is the authoritative manifest; `<id>.md` is a compatibility pointe
 Use an optional `.claude/maverick/project.json` for explicit pack selection and command
 overrides; keep Markdown-only adapters working. Explicit selection precedes manifest
 file detection. Missing or invalid explicit packs must be reported as errors.
+
+Shared backend rules live in `.claude/maverick/principles/`; apply them with the
+adapter's Accepted Variants when a pack prompt references them.
 
 Use planner/implementer slots from the manifest. Route reviewers in declaration order
 using `always` or any intersection with the extensible `classification.json` capabilities.

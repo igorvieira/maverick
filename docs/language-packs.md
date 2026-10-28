@@ -1,9 +1,10 @@
 # Language pack contract (schema version 1)
 
-A language pack implements a generic protocol. Go is the first implementation;
-TypeScript is a second, smaller implementation. Neither defines the runtime's internal
-model. The protocol shares slots, capabilities, command data, and structured results;
-it does not share the intellectual content of reviewers.
+A language pack implements a generic protocol. Six packs ship today: Go, TypeScript
+(Node.js backend and frontend), Rust, Python, Rails, and Elixir. None defines the
+runtime's internal model. The protocol shares slots, capabilities, command data, and
+structured results. Backend review content is shared through language-neutral
+principles (below); each pack adds only its language's idioms and libraries.
 
 ## Boundaries
 
@@ -12,7 +13,8 @@ it does not share the intellectual content of reviewers.
 | Runtime core | Lifecycle, state machine, artifacts, validated capabilities, routing, structured review aggregation |
 | Pack loader | JSON loading, schema validation, agent file checks, file-based detection |
 | Language pack | Detection signals, default commands, prompt references, reviewer definitions, capability mappings, semantic instructions |
-| Project adapter | Selected packs, repository commands, conventions, layout, project-specific overrides |
+| Shared principles | Language-neutral backend rules applied by pack reviewers (`claude/principles/`) |
+| Project adapter | Selected packs, repository commands, conventions, layout, accepted variants, project-specific overrides |
 
 The Rust runtime has no conditional branches for particular languages or agent names.
 The core has no filesystem dependencies. `maverick-packs` supplies loading and detection;
@@ -52,6 +54,54 @@ Prompts remain authoritative for semantic guidance. Existing Go reviewers keep t
 DDD, Clean Architecture, eventing, transaction, concurrency, and idiom instructions.
 Their added output protocol supplies structured results alongside the existing report.
 The Go planner emits extensible capabilities and consults the manifest for routing.
+
+## Shared principles
+
+`claude/principles/` holds one file per backend review area: `domain.md`,
+`application-flow.md`, `adapters.md`, `eventing.md`, `architecture.md`, and
+`red-team.md`. The installer copies them to `.claude/maverick/principles/` whenever at
+least one pack is installed. Pack prompts reference them by path and add a short list of
+language-specific checks, so a rule changes in one place for every language.
+
+The Go pack predates the directory and keeps the same rules inline; it is the reference
+the principles were extracted from.
+
+Every principles file inherits `README.md`'s override rules:
+
+1. Variants listed in the adapter's **Accepted Variants** section are reported as
+   `low`/`info`, never blocking.
+2. Reviews grade the diff; pre-existing violations are listed once as existing debt.
+3. Data-loss rules (lost events, non-idempotent consumers of at-least-once delivery,
+   unbounded retries, missing timeouts, unowned background work) stay blocking in new
+   code unless the adapter lists them as accepted risks with an owner.
+4. Existing project abstractions always win over new ones.
+
+## Pack catalog
+
+| Pack | Detection | Default commands | Always | Conditional |
+|---|---|---|---|---|
+| `go` | `go.mod` | gofmt, go build, go test | idiom | domain, application_flow, adapter, eventing, architecture |
+| `typescript` | `tsconfig.json` or `package.json` | npm build/test/lint/typecheck | type_safety | frontend, contracts, domain, application_flow, adapter, eventing, architecture |
+| `rust` | `Cargo.toml` | cargo fmt/build/test/clippy | idiom | domain, application_flow, adapter, eventing, architecture |
+| `python` | `pyproject.toml`, `requirements.txt` or `setup.py` | ruff format/check, pytest | idiom | domain, application_flow, adapter, eventing, architecture |
+| `rails` | `Gemfile` and `config/application.rb` | bin/rails test, rubocop | idiom | domain, application_flow, adapter, eventing, architecture |
+| `elixir` | `mix.exs` | mix format/compile/test | idiom | domain, application_flow, adapter, eventing, architecture |
+
+Default commands are hints: planners confirm them against the repository, and the
+adapter overrides them (for example `bundle exec rspec` or `uv run pytest`).
+
+All packs share the capability vocabulary `domain`, `aggregate_design`,
+`application_flow`, `adapters`, `api_contract`, `database`, `eventing`,
+`eventing_strategy`, `architecture`, `transaction_boundaries`,
+`cross_service_consistency`, and `concurrency`, plus pack-specific values (for
+example `frontend`, `runtime_validation`, `unsafe_code`, `otp_processes`). The red team
+runs for `domain`, `eventing`, `aggregate_design`, `transaction_boundaries`,
+`cross_service_consistency`, and `eventing_strategy` in every pack.
+
+To add a language, create `claude/agents/<id>/` with a `pack.json` that uses the same
+slots and capabilities, a planner, an implementer, an always-on idiom reviewer, and
+reviewers that reference the shared principles. Then add the ID to the pack lists in
+`crates/maverick-packs/tests/contract.rs` and `crates/maverick-cli/tests/packs.rs`.
 
 ## Manifest fields
 
@@ -117,6 +167,9 @@ The router selects `always` reviewers and any reviewer whose capabilities inters
 the classification. It filters the manifest array once, preserving declaration order
 and returning each reviewer only once. Unknown capabilities are valid and harmless.
 Conditional reviewers and gates must declare at least one capability.
+
+`./setup.sh project` without `--pack` applies the same detection rules (using `jq`) and
+installs every matching pack.
 
 Multi-pack selection follows explicit adapter order. Without an adapter, detection
 preserves the caller's manifest order. Duplicate pack IDs are rejected. Reviewer
@@ -221,9 +274,9 @@ resolution, error handling, override precedence, and absence of command executio
 
 ## Current limits
 
-The TypeScript pack is intentionally small: planning, implementation, mandatory type
-safety review, frontend/accessibility review, and contract/runtime-validation review.
-It does not attempt to match Go's six semantic reviewers. Detection uses exact paths,
+Non-Go packs keep their prompts short and depend on the shared principles being
+installed; a hand-copied agent without `.claude/maverick/principles/` is incomplete.
+Detection uses exact paths,
 not globs or package-content analysis. Prompt frontmatter validation, provider dispatch,
 command execution, automatic lifecycle gates, scheduler, parallel execution, and future
 schema migrations remain outside this slice. Filesystem loading assumes a trusted local

@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+"""Run Maverick unattended: one plan, one reply, then autonomous execution.
+
+  maverick-dispatch plan    [--thread ID] "<message>"            Phase A: worktree + plan, exits
+  maverick-dispatch execute [--thread ID] [--run RUN] "<reply>"  Phase B: resume with the reply
+  maverick-dispatch show    RUN
+  maverick-dispatch list
+
+<message> may start with "[executor]" and/or "<repo>:" (only when <repo> is in the registry):
+  "[codex] api: fix the login timeout"   "fix the login timeout"   "TICKET-123"
+
+Registry: $MAVERICK_DISPATCH_CONFIG or ~/.config/maverick/dispatch.json (see dispatch.json.example).
+The last stdout line is always one JSON object for the caller (Hermes) to read.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+
+CONFIG = Path(os.environ.get("MAVERICK_DISPATCH_CONFIG", "~/.config/maverick/dispatch.json")).expanduser()
+TICKETS = re.compile(r"^[A-Z][A-Z0-9]+-\d+(,[A-Z][A-Z0-9]+-\d+)*$")
+
+
+class DispatchError(Exception):
+    pass
+
+
+def load_config():
+    try:
+        config = json.loads(CONFIG.read_text())
+    except OSError:
+        raise DispatchError("registry not found: {} (run ./setup.sh hermes)".format(CONFIG))
+    except ValueError as error:
+        raise DispatchError("invalid registry {}: {}".format(CONFIG, error))
+    if not config.get("repos"):
+        raise DispatchError("registry has no repos: {}".format(CONFIG))
+    return config
+
+
+def expand(path):
+    return Path(path).expanduser()
+
+
+def state_root(config):
+    return expand(config.get("state_root", "~/.maverick/unattended"))
+
+
+def report(phase, line, thread_id):
+    reporter = shutil.which("maverick-report")
+    if reporter:
+        env = dict(os.environ, MAVERICK_DISCORD_THREAD_ID=thread_id or "")
+        subprocess.run([reporter, phase, line], env=env, check=False)
+
+
+def thread_from(args):
+    return args.pop("thread", None) or os.environ.get("HERMES_SESSION_THREAD_ID") \
+        or os.environ.get("HERMES_SESSION_CHAT_ID") or ""
+
+
+def parse_message(message, config):
+    executor = config.get("default_executor", "claude")
+    note = ""
+    match = re.match(r"^\s*\[([a-z0-9_-]+)\]\s*", message, re.I)
+    if match:
+        executor = match.group(1).lower()
+        message = message[match.end():]
+    repo = config.get("default_repo") or next(iter(config["repos"]))
+    match = re.match(r"^\s*([A-Za-z0-9_.-]+):\s+", message)
+    if match and match.group(1) in config["repos"]:
+        repo = match.group(1)
+        message = message[match.end():]
+    task = message.strip()
+    if not task:
+        raise DispatchError("empty task")
+
+    executors = config.get("executors", {})
+    if not executors.get(executor, {}).get("enabled"):
+        fallback = config.get("default_executor", "claude")
+        if executor == fallback or not executors.get(fallback, {}).get("enabled"):
+            raise DispatchError("executor '{}' is not enabled".format(executor))
+        note = "{} disabled, using {}".format(executor, fallback)
+        executor = fallback
+    return repo, executor, task, note
+
+
+def slugify(text):
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:40].rstrip("-") or "task"
+
+
+def git(repo_path, *args):
+    return subprocess.run(["git", "-C", str(repo_path)] + list(args), capture_output=True, text=True)
+
+
+def create_worktree(config, repo, run_id):
+    spec = config["repos"][repo]
+    repo_path = expand(spec["path"])
+    base = spec.get("base", "main")
+    if not (repo_path / ".git").exists():
+        raise DispatchError("not a git repo: {}".format(repo_path))
+    worktree = expand(config.get("worktree_root", "~/.maverick/worktrees")) / repo / run_id
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    branch = "maverick/" + run_id
+    git(repo_path, "fetch", "origin", base)
+    start = "origin/" + base if git(repo_path, "rev-parse", "--verify", "origin/" + base).returncode == 0 else base
+    result = git(repo_path, "worktree", "add", "-b", branch, str(worktree), start)
+    if result.returncode != 0:
+        raise DispatchError("git worktree add failed: " + result.stderr.strip())
+    return worktree, branch
+
+
+def fill(template, values):
+    return [part.format(**values) for part in template]
+
+
+def run_executor(run, phase, prompt):
+    config = load_config()
+    spec = config["executors"][run["executor"]]
+    values = {"prompt": prompt, "session_id": run["session_id"]}
+    argv = fill(spec["plan" if phase == "plan" else "resume"], values)
+    env = dict(os.environ,
+               MAVERICK_STATE_DIR=run["state_dir"],
+               MAVERICK_DISCORD_THREAD_ID=run.get("thread_id", ""),
+               PATH=str(Path("~/.local/bin").expanduser()) + os.pathsep + os.environ.get("PATH", ""))
+    log = Path(run["state_dir"]) / "{}.log".format(phase)
+    with log.open("a") as out:
+        proc = subprocess.Popen(argv, cwd=run["worktree"], env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True)
+        for line in proc.stdout:
+            out.write(line)
+            if spec.get("session") == "codex-json" and not run.get("session_id"):
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(event, dict) and event.get("thread_id"):
+                    run["session_id"] = event["thread_id"]
+                    save_run(run)
+        proc.wait()
+    return proc.returncode, log
+
+
+def save_run(run):
+    path = Path(run["state_dir"]) / "run.json"
+    path.write_text(json.dumps(run, indent=2) + "\n")
+
+
+def load_run(config, run_id):
+    path = state_root(config) / run_id / "run.json"
+    if not path.exists():
+        raise DispatchError("unknown run: {}".format(run_id))
+    return json.loads(path.read_text())
+
+
+def all_runs(config):
+    root = state_root(config)
+    runs = [json.loads(p.read_text()) for p in sorted(root.glob("*/run.json"))] if root.exists() else []
+    return sorted(runs, key=lambda r: r["created_at"])
+
+
+def tail(path, lines=15):
+    try:
+        return "\n".join(Path(path).read_text().splitlines()[-lines:])
+    except OSError:
+        return ""
+
+
+def task_args(task):
+    if TICKETS.match(task):
+        return task
+    return '--local "{}"'.format(task.replace("\\", "\\\\").replace('"', '\\"'))
+
+
+def cmd_plan(args, message):
+    config = load_config()
+    thread_id = thread_from(args)
+    repo, executor, task, note = parse_message(message, config)
+    run_id = "{}-{}".format(time.strftime("%Y%m%d-%H%M%S"), slugify(task))
+    state_dir = state_root(config) / run_id
+    state_dir.mkdir(parents=True)
+    spec = config["executors"][executor]
+    run = {
+        "run_id": run_id, "repo": repo, "executor": executor, "task": task,
+        "thread_id": thread_id, "state_dir": str(state_dir), "phase": "planning",
+        "session_id": str(uuid.uuid4()) if spec.get("session", "preassign") == "preassign" else "",
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    if note:
+        report("DISPATCH", note, thread_id)
+    worktree, branch = create_worktree(config, repo, run_id)
+    run.update(worktree=str(worktree), branch=branch)
+    save_run(run)
+    report("PLAN", "{} · {} · planning in {}".format(repo, executor, branch), thread_id)
+
+    prompt = spec["plan_prompt"].format(task_args=task_args(task))
+    code, log = run_executor(run, "plan", prompt)
+    plan = state_dir / "plan.md"
+    if plan.exists():
+        run["phase"] = "awaiting_reply"
+        save_run(run)
+        return {"status": "plan_ready", "run": run_id, "plan": str(plan), "note": note}
+    run["phase"] = "failed"
+    save_run(run)
+    return {"status": "failed", "run": run_id, "exit": code, "log": str(log), "tail": tail(log)}
+
+
+def cmd_execute(args, reply):
+    config = load_config()
+    thread_id = thread_from(args)
+    run_id = args.pop("run", None)
+    if run_id:
+        run = load_run(config, run_id)
+    else:
+        waiting = [r for r in all_runs(config) if r["phase"] == "awaiting_reply"
+                   and (not thread_id or r.get("thread_id") == thread_id)]
+        if not waiting:
+            raise DispatchError("no run is waiting for a reply" + (" in this thread" if thread_id else ""))
+        run = waiting[-1]
+    if run["phase"] != "awaiting_reply":
+        raise DispatchError("run {} is {}, not awaiting a reply".format(run["run_id"], run["phase"]))
+    if not run.get("session_id"):
+        raise DispatchError("run {} has no executor session to resume".format(run["run_id"]))
+
+    state_dir = Path(run["state_dir"])
+    plan = state_dir / "plan.md"
+    plan_mtime = plan.stat().st_mtime if plan.exists() else 0
+    run["phase"] = "executing"
+    save_run(run)
+    spec = config["executors"][run["executor"]]
+    code, log = run_executor(run, "execute", spec["resume_prompt"].format(reply=reply.strip()))
+
+    result = state_dir / "result.json"
+    if result.exists():
+        outcome = json.loads(result.read_text())
+        run["phase"] = outcome.get("status", "completed")
+        save_run(run)
+        return dict(outcome, run=run["run_id"])
+    if plan.exists() and plan.stat().st_mtime > plan_mtime:
+        run["phase"] = "awaiting_reply"
+        save_run(run)
+        return {"status": "plan_ready", "run": run["run_id"], "plan": str(plan), "note": "plan revised"}
+    run["phase"] = "failed"
+    save_run(run)
+    return {"status": "failed", "run": run["run_id"], "exit": code, "log": str(log), "tail": tail(log)}
+
+
+def parse_flags(argv):
+    flags, rest = {}, []
+    while argv:
+        item = argv.pop(0)
+        if item in ("--thread", "--run") and argv:
+            flags[item[2:]] = argv.pop(0)
+        else:
+            rest.append(item)
+    return flags, " ".join(rest)
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    command, (flags, text) = argv[1], parse_flags(argv[2:])
+    try:
+        if command == "plan":
+            out = cmd_plan(flags, text)
+        elif command == "execute":
+            out = cmd_execute(flags, text or "ok")
+        elif command == "show":
+            out = load_run(load_config(), text)
+        elif command == "list":
+            out = [{k: r.get(k) for k in ("run_id", "phase", "repo", "executor", "task")}
+                   for r in all_runs(load_config())]
+        else:
+            raise DispatchError("unknown command: {}".format(command))
+    except DispatchError as error:
+        print(json.dumps({"status": "error", "error": str(error)}))
+        return 2
+    print(json.dumps(out))
+    return 0 if not (isinstance(out, dict) and out.get("status") == "failed") else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -17,7 +17,8 @@
   },
   "agents": {
     "planner": "typescript-task-scope-planner",
-    "implementer": "typescript-implementer"
+    "implementer": "typescript-implementer",
+    "red_team": "typescript-adversarial-architect"
   },
   "reviewers": [
     {
@@ -70,8 +71,123 @@
           "high"
         ]
       }
+    },
+    {
+      "id": "domain",
+      "agent": "typescript-domain-reviewer",
+      "always": false,
+      "capabilities": [
+        "domain"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "application_flow",
+      "agent": "typescript-application-flow-reviewer",
+      "always": false,
+      "capabilities": [
+        "application_flow"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "adapter",
+      "agent": "typescript-adapter-reviewer",
+      "always": false,
+      "capabilities": [
+        "adapters",
+        "api_contract",
+        "database"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "eventing",
+      "agent": "typescript-eventing-reviewer",
+      "always": false,
+      "capabilities": [
+        "eventing"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
+    },
+    {
+      "id": "architecture",
+      "agent": "typescript-arch-reviewer",
+      "always": false,
+      "capabilities": [
+        "architecture",
+        "transaction_boundaries",
+        "cross_service_consistency",
+        "concurrency"
+      ],
+      "blocking": {
+        "statuses": [
+          "fail"
+        ],
+        "severities": [
+          "blocker",
+          "high"
+        ]
+      }
     }
   ],
+  "red_team": {
+    "always": false,
+    "capabilities": [
+      "domain",
+      "eventing",
+      "aggregate_design",
+      "transaction_boundaries",
+      "cross_service_consistency",
+      "eventing_strategy"
+    ],
+    "blocking": {
+      "statuses": [
+        "fail"
+      ],
+      "severities": [
+        "blocker",
+        "high"
+      ]
+    },
+    "legacy_verdicts": {
+      "Architecture holds under scrutiny": "pass",
+      "Architecture holds with identified risks": "warn",
+      "Architecture has critical flaws": "fail"
+    }
+  },
   "review_policy": {
     "max_fix_rounds": 3,
     "rerun_blocked_only": true,

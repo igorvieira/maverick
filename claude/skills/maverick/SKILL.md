@@ -9,7 +9,7 @@ description: >
 user_invocable: true
 arguments:
   - name: tickets
-    description: "Ticket(s) (TICKET-123 or TICKET-123,TICKET-124) OR --local \"task description\" for local tasks"
+    description: "Ticket(s) (TICKET-123 or TICKET-123,TICKET-124) OR --local \"task description\" for local tasks; add --unattended=plan|execute for headless dispatch"
     required: true
 ---
 
@@ -99,6 +99,21 @@ When `--local` is used:
 - Branch names are generated from the description (e.g., `feature/add-dark-mode-toggle`)
 - Everything else (plan, implement, QA, deliver, PR) works the same
 
+### Unattended Mode (Headless Dispatch)
+```bash
+# Phase A — run by a dispatcher (e.g. Hermes) inside a fresh worktree; exits with a plan
+/maverick --unattended=plan --local "Fix login validation"
+
+# Phase B — the same executor session resumed with the user's single reply
+Plan reply from the user: <<<ok, 1: use X>>>
+Continue Maverick with --unattended=execute.
+```
+
+Unattended mode splits the workflow into two headless runs around the single approval
+checkpoint, so a dispatcher can carry that one interruption to wherever the user is
+(Discord, Slack, …) and nothing else ever waits on a human. See
+[Unattended Mode](#unattended-mode) for the full contract.
+
 ---
 
 ## Workflow Overview
@@ -130,7 +145,9 @@ keep a second table of language-specific rules in this workflow.
 
 Read and validate schema version 1, unique IDs, required planner/implementer slots,
 optional red-team slot and matching gate, reviewer definitions, commands, and agent files.
-Read the selected agents' prompts for language semantics. Invalid manifests must surface
+Read the selected agents' prompts for language semantics. Backend reviewers of every
+pack except Go also read the shared rules in `.claude/maverick/principles/` and the
+adapter's **Accepted Variants** section; reviews grade the diff, not pre-existing code. Invalid manifests must surface
 clear errors before implementation. When the experimental CLI is available, use:
 
 ```bash
@@ -227,6 +244,9 @@ rmdir $WORKTREE_BASE  # if empty
 
 After user approval, execution is **FULLY AUTONOMOUS** — no more questions or confirmations.
 
+In unattended mode the checkpoint is the boundary between the two runs; reports follow
+[Unattended Mode](#unattended-mode) instead of the schedule below.
+
 ### Progress Report Schedule
 
 | Elapsed Time | Report Frequency | Action |
@@ -294,6 +314,98 @@ Instead:
 - ✅ Document decisions in reports
 - ✅ Flag issues in final summary
 - ✅ Continue until completion or hard blocker
+
+---
+
+## Unattended Mode
+
+`--unattended=plan|execute` runs Maverick headless (`claude -p`, `codex exec`, `grok -p`) under a
+dispatcher. The user is interrupted **exactly once**: when the plan is ready. Everything that
+can be learned or can fail before implementation is pushed **before** that checkpoint.
+
+### Contract with the dispatcher
+
+| Input (env) | Meaning |
+|---|---|
+| `MAVERICK_STATE_DIR` | Directory for this run's files (`plan.md`, `result.json`). Required. |
+| `MAVERICK_DISCORD_WEBHOOK` / `MAVERICK_DISCORD_THREAD_ID` | Used only by `maverick-report`; never read them yourself. |
+
+The dispatcher launches the executor **inside a fresh git worktree** on a temporary branch
+(`maverick/<slug>`) and captures the executor's session ID to resume Phase B.
+
+### `--unattended=plan` (Phase A)
+
+Run Phases 0–2, plus the parts of Phase 3 and pre-flight that do not change code:
+
+1. **Branch**: you are already in the worktree. Rename the branch per Step 3.1
+   (`git branch -m <branch-name>`) when the adapter asks for tracker-suggested names.
+2. **Pre-flight**: install dependencies and run the resolved build/test commands once
+   as a **baseline**. Record what was already failing — that is not yours to fix silently,
+   it goes in the plan. Check `gh auth status` and that every resolved command exists.
+3. **Red team always on**: invoke the selected pack's `agents.red_team` regardless of its gate
+   (generic fallback: a senior-architect adversarial pass). Revise until it does not block.
+4. **Investigate before asking**: a question goes to *Open Questions* only if the code, git
+   history, adapter, and existing patterns cannot answer it — i.e. a product choice or two
+   equally valid designs. Everything you inferred goes to *Assumed (verify only)*.
+5. Write `$MAVERICK_STATE_DIR/plan.md` in the Step 2.2 format plus:
+   ```markdown
+   ### Pre-flight
+   - Worktree / branch: <path> / <branch>
+   - Baseline build: ✅ | ❌ <summary>   - Baseline tests: ✅ | ❌ <summary>
+   - Tooling: gh auth ✅/❌, missing commands: [...]
+
+   ### Assumed (verify only)
+   - ...
+
+   ### Open Questions (answer in one reply)
+   1. ... (default if unanswered: ...)
+   ```
+   Every open question **must state the default** you will apply if the reply is just "ok".
+6. Report `PLAN` via `maverick-report`, print `MAVERICK_PLAN_READY <path to plan.md>` and
+   **exit**. Do not wait for input; do not write code.
+
+### `--unattended=execute` (Phase B)
+
+The resume message carries the user's reply verbatim (`Plan reply from the user: <<<…>>>`) and
+**is the final authorization**:
+
+- Apply the answers; unanswered questions take their stated defaults. Never request a second
+  approval, even if an answer changes the plan — revise it and proceed, noting the change.
+- A reply that rejects the plan (e.g. "no", "redo", "replan") means: revise the plan, overwrite
+  `plan.md`, print `MAVERICK_PLAN_READY` again and exit — this is the only way back to Phase A.
+- Otherwise skip the completed Phases 0–3 and continue from Phase 4 through Phase 8.
+
+### Reports
+
+Replace the time-based schedule with one call per phase transition and per notable decision:
+
+```bash
+command -v maverick-report >/dev/null && maverick-report IMPLEMENT "reviewer panel converged (3/3)"
+```
+
+Lines are short, factual, and never questions. A missing reporter is a no-op, not an error.
+
+### Phase 8 without ScheduleWakeup
+
+Headless runs cannot yield. Block-wait instead (`sleep 590` in one Bash call), then classify
+exactly as Phase 8 step 3 and run the resolver inline when there are actionable items.
+
+### Blockers and regressions
+
+After approval, a hard blocker (missing access, external outage, a change that would break
+existing behavior per Rule 12/15) is **never** a question:
+
+1. Commit what is safe, push the branch, open the PR as **draft** with a `## Blocker` section.
+2. Report `BLOCKED` with one line.
+3. Finish with the result line below using `"status":"blocked"`.
+
+### Result
+
+Write `$MAVERICK_STATE_DIR/result.json` and print it as the last line:
+
+```json
+{"status":"completed|blocked","pr":"<url or null>","branch":"<branch>","summary":"<one sentence>"}
+```
 
 ---
 
@@ -771,7 +883,7 @@ Use TaskList to track progress:
 
 ### If blocked on implementation
 - Document the blocker
-- Ask user for help
+- Ask user for help (unattended: draft PR + `blocked` result instead — see Unattended Mode)
 - Do NOT output completion promise
 
 ### If QA fails
@@ -793,7 +905,7 @@ Use TaskList to track progress:
 
 1. **ONE approval only** - after planning, then fully autonomous
 2. **No interruptions** - never ask questions after approval
-3. **Progress reports** - follow the time-based schedule
+3. **Progress reports** - follow the time-based schedule (unattended: one `maverick-report` per phase)
 4. **Use the right agents** - manifest slots for packs, senior playbooks for fallback/UI support/QA
 5. **QA must pass** before delivery
 6. **No Co-Authored-By** in commits
@@ -805,5 +917,5 @@ Use TaskList to track progress:
 12. **NO REGRESSIONS** - never remove or modify existing functionality without explicit user authorization
 13. **Preserve all tests** - never delete, skip, or disable existing tests
 14. **Regression check mandatory** - QA phase must verify no regressions before delivery
-15. **When in doubt, STOP** - if a change might cause regression, stop and ask for authorization
+15. **When in doubt, STOP** - if a change might cause regression, stop and ask for authorization (unattended: surface it in the plan, or deliver as a blocked draft PR after approval)
 16. **Project facts live in the adapter** - never hardcode them into this skill or the packs

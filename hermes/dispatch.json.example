@@ -1,0 +1,46 @@
+{
+  "default_repo": "maverick",
+  "default_executor": "claude",
+  "state_root": "~/.maverick/unattended",
+  "worktree_root": "~/.maverick/worktrees",
+  "repos": {
+    "maverick": { "path": "~/Projects/maverick", "base": "main" }
+  },
+  "executors": {
+    "claude": {
+      "enabled": true,
+      "session": "preassign",
+      "plan_prompt": "/maverick --unattended=plan {task_args}",
+      "resume_prompt": "Plan reply from the user: <<<{reply}>>>\nContinue Maverick with --unattended=execute.",
+      "plan": ["claude", "-p", "{prompt}", "--session-id", "{session_id}", "--output-format", "json",
+               "--permission-mode", "bypassPermissions",
+               "--disallowedTools", "Bash(git push --force:*)", "Bash(git push -f:*)",
+               "Bash(git push origin main:*)", "Bash(git push origin master:*)",
+               "Bash(gh pr merge:*)", "Bash(rm -rf /:*)", "Bash(rm -rf ~:*)"],
+      "resume": ["claude", "-p", "{prompt}", "--resume", "{session_id}", "--output-format", "json",
+                 "--permission-mode", "bypassPermissions",
+                 "--disallowedTools", "Bash(git push --force:*)", "Bash(git push -f:*)",
+                 "Bash(git push origin main:*)", "Bash(git push origin master:*)",
+                 "Bash(gh pr merge:*)", "Bash(rm -rf /:*)", "Bash(rm -rf ~:*)"]
+    },
+    "codex": {
+      "enabled": true,
+      "session": "codex-json",
+      "plan_prompt": "Use the maverick skill with --unattended=plan {task_args}",
+      "resume_prompt": "Plan reply from the user: <<<{reply}>>>\nContinue the maverick skill with --unattended=execute.",
+      "plan": ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", "{prompt}"],
+      "resume": ["codex", "exec", "resume", "--json", "--dangerously-bypass-approvals-and-sandbox",
+                 "{session_id}", "{prompt}"]
+    },
+    "grok": {
+      "enabled": false,
+      "session": "preassign",
+      "plan_prompt": "Use the maverick skill with --unattended=plan {task_args}",
+      "resume_prompt": "Plan reply from the user: <<<{reply}>>>\nContinue the maverick skill with --unattended=execute.",
+      "plan": ["grok", "-p", "{prompt}", "--session-id", "{session_id}", "--output-format", "json",
+               "--always-approve"],
+      "resume": ["grok", "-p", "{prompt}", "--resume", "{session_id}", "--output-format", "json",
+                 "--always-approve"]
+    }
+  }
+}

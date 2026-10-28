@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Post one silent progress line to the Discord thread of a Maverick unattended run.
+
+Usage: maverick-report <PHASE> "<line>"
+
+Reads MAVERICK_DISCORD_WEBHOOK and MAVERICK_DISCORD_THREAD_ID from the environment, falling back
+to ~/.config/maverick/secrets.env for the webhook. Messages carry Discord's SUPPRESS_NOTIFICATIONS
+flag and cannot mention anyone. Always exits 0: a missing or failing reporter must never stop a run.
+"""
+import json
+import os
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+SUPPRESS_NOTIFICATIONS = 1 << 12
+SECRETS = Path(os.environ.get("MAVERICK_SECRETS", "~/.config/maverick/secrets.env")).expanduser()
+
+
+def read_secret(name):
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        for line in SECRETS.read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == name:
+                return value.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def main(argv):
+    if len(argv) < 3:
+        print('usage: maverick-report <PHASE> "<line>"', file=sys.stderr)
+        return 0
+    webhook = read_secret("MAVERICK_DISCORD_WEBHOOK")
+    if not webhook:
+        return 0
+    url = webhook
+    thread_id = os.environ.get("MAVERICK_DISCORD_THREAD_ID", "")
+    if thread_id:
+        url += ("&" if "?" in url else "?") + "thread_id=" + thread_id
+    content = "📍 [{}] {} · {}".format(time.strftime("%H:%M"), argv[1].upper(), " ".join(argv[2:]))
+    body = json.dumps({
+        "content": content[:2000],
+        "flags": SUPPRESS_NOTIFICATIONS,
+        "allowed_mentions": {"parse": []},
+    }).encode()
+    request = urllib.request.Request(url, data=body, method="POST", headers={
+        "Content-Type": "application/json",
+        # Discord rejects urllib's default user agent.
+        "User-Agent": "maverick-report (https://github.com/igorvieira/maverick, 1)",
+    })
+    try:
+        urllib.request.urlopen(request, timeout=10).close()
+    except Exception as error:  # reporting is best effort by contract
+        print("maverick-report: {}".format(error), file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

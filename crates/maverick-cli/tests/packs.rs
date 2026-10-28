@@ -14,7 +14,7 @@ fn source(id: &str) -> PathBuf {
 }
 
 #[test]
-fn both_packs_use_the_same_cli_path_without_run_storage() {
+fn every_pack_uses_the_same_cli_path_without_run_storage() {
     for (id, caps, expected) in [
         (
             "go",
@@ -24,7 +24,27 @@ fn both_packs_use_the_same_cli_path_without_run_storage() {
         (
             "typescript",
             ["frontend", "api_contract"],
-            vec!["type_safety", "frontend", "contracts"],
+            vec!["type_safety", "frontend", "contracts", "adapter"],
+        ),
+        (
+            "rust",
+            ["domain", "eventing"],
+            vec!["idiom", "domain", "eventing"],
+        ),
+        (
+            "python",
+            ["application_flow", "adapters"],
+            vec!["idiom", "application_flow", "adapter"],
+        ),
+        (
+            "rails",
+            ["domain", "eventing"],
+            vec!["idiom", "domain", "eventing"],
+        ),
+        (
+            "elixir",
+            ["architecture", "concurrency"],
+            vec!["idiom", "architecture"],
         ),
     ] {
         let root = tempdir().unwrap();
@@ -143,7 +163,7 @@ fn cli_loads_installed_layout_classification_and_adapter_without_executing_comma
     let result: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(result["packs"][0]["id"], "typescript");
     assert_eq!(result["packs"][1]["id"], "go");
-    assert_eq!(result["packs"][0]["reviewers"].as_array().unwrap().len(), 3);
+    assert_eq!(result["packs"][0]["reviewers"].as_array().unwrap().len(), 4);
     assert!(result["packs"][0]["commands"]["test"]
         .as_str()
         .unwrap()
