@@ -41,6 +41,8 @@ Before anything else, read `.claude/maverick/project.md`. It defines:
 - **layout & conventions**: where code lives, API contract style
 - **migrations & codegen** workflow
 - **error handling / logging / testing** conventions
+- **observability**: where logs go (platform logs, Datadog, Grafana/Loki, Axiom…), the
+  structured log format, and any health/metrics endpoints — optional; defaults below
 - **tickets & branches**: ticket prefix, branch source (tracker-suggested vs slug), default branch
 - **PR & review** conventions, and **docs pointers** for deeper context
 
@@ -495,6 +497,11 @@ answer outstanding design questions. Do not substitute a language-specific gate 
 - Risk: ... | Mitigation: ...
 - [Red-team findings when selected, each with its mitigation]
 
+### Observability
+- N/A: <reason>  (default for UI, copy, styles, refactors without behavior change, tests, docs)
+- OR, only for a job/worker, external integration, new endpoint, payments or auth:
+  how we'll know it broke in production (the log event and fields, existing or new)
+
 ### Adapter Facts Assumed (only if the adapter was missing/incomplete)
 - [facts discovered in Phase 0 that need confirmation]
 
@@ -667,6 +674,18 @@ Apply senior-qa approach for validation:
   - Zero blocking verdicts remain; fix loop (Step 4.4) converged
   - Final verdicts and Accepted Trade-offs recorded in the QA report
 
+### OBSERVABILITY CHECK (only when the plan's Observability is not N/A)
+
+- [ ] Errors on the new path are logged as structured JSON with context:
+      `event`, ids (request/job/entity), `outcome`, `error` — not free text only
+- [ ] No secrets, tokens, emails or user content in logs (check the diff)
+
+Structured JSON logs to stdout are the contract: any log-based tool (Datadog,
+Grafana/Loki, Axiom, the platform's own log view) can ingest and alert on them with
+no code change, through a log drain or agent. Choosing or wiring a tool is out of
+scope for a task unless the task asks for it. Keep this light: it does not apply to
+every change, and it never requires metrics, traces or a specific vendor.
+
 ### REGRESSION CHECK (MANDATORY)
 
 **Before ANY delivery, verify NO REGRESSIONS were introduced:**
@@ -752,6 +771,9 @@ Create delivery summary in English with bullets:
 1. Step 1
 2. Step 2
 3. Step 3
+
+### How to Monitor (only when Observability is not N/A and it was deployed)
+- Log query: `event:<name> outcome:error` (same query in Datadog, Loki or the platform logs)
 
 ### Technical Notes
 - <Any relevant implementation details>
@@ -919,3 +941,4 @@ Use TaskList to track progress:
 14. **Regression check mandatory** - QA phase must verify no regressions before delivery
 15. **When in doubt, STOP** - if a change might cause regression, stop and ask for authorization (unattended: surface it in the plan, or deliver as a blocked draft PR after approval)
 16. **Project facts live in the adapter** - never hardcode them into this skill or the packs
+17. **Observability where it matters** - a change to a job, integration, endpoint, payments or auth states how a production failure shows up (a structured JSON log event); everything else is N/A. Never log secrets or user content

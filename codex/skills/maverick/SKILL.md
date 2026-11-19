@@ -10,6 +10,7 @@ Maverick is a disciplined end-to-end development workflow for Codex. It supports
 ## Core Policy
 
 - No regressions: preserve existing behavior unless the user explicitly authorizes a change.
+- Observability where it matters: for a job/worker, external integration, new endpoint, payments or auth, say in the plan how a production failure shows up and log errors on that path as structured JSON (`event`, ids, `outcome`, `error`), with no secrets or user content. Everything else is N/A. Structured JSON logs let Datadog, Grafana/Loki or the platform logs ingest them with no code change.
 - Read before editing: inspect the codebase, tests, and local patterns first.
 - Keep changes scoped: avoid opportunistic refactors.
 - Validate honestly: run relevant checks and report anything skipped or blocked.
